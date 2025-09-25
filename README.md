@@ -1,52 +1,36 @@
 # 💳 Exa Payment - Sistema de Pagamentos
 
-Sistema de pagamentos desenvolvido com **Clean Architecture**, **DDD** e **Clean Code**, seguindo as melhores práticas de desenvolvimento.
+Sistema de pagamentos desenvolvido com Clean Architecture, DDD e NestJS, seguindo as melhores práticas de desenvolvimento.
 
 ## 🚀 Quick Start
 
-### Pré-requisitos
-
-- **Node.js** >= 18.0.0
-- **pnpm** >= 8.0.0
-- **Docker** e **Docker Compose**
-
-### Setup em 1 minuto
+### 1. Configuração Inicial
 
 ```bash
-# 1. Clone e instale dependências
-git clone <repo-url>
-cd exa-payment
+# Instalar dependências
 pnpm install
 
-# 2. Se houver erro de tslib, limpe o cache:
-pnpm store prune
-rm -rf node_modules
-pnpm install
-
-# 3. Suba os serviços (Postgres, RabbitMQ, etc.)
+# Subir banco de dados
 pnpm docker:up
 
-# 4. Execute migrações e seed
+# Executar migrações
 pnpm prisma:migrate
+
+# Popular com dados iniciais
 pnpm prisma:seed
+```
 
-# 5. Inicie a API
+### 2. Desenvolvimento
+
+```bash
+# Iniciar API em modo desenvolvimento
 pnpm dev
-```
 
-A API estará disponível em `http://localhost:3000`
+# Executar testes
+pnpm test
 
-## 📁 Estrutura do Projeto
-
-```
-exa-payment/
-├── apps/
-│   └── api/                    # Aplicação principal NestJS
-├── packages/
-│   ├── config/                 # Configurações compartilhadas
-│   └── contracts/              # Schemas e contratos
-├── dev/                        # Docker, seeds, scripts
-└── docs/                       # Documentação
+# Executar testes E2E
+pnpm test:e2e
 ```
 
 ## 🏗️ Arquitetura
@@ -54,155 +38,116 @@ exa-payment/
 ### Clean Architecture + DDD
 
 ```
-interfaces/   → controllers, DTOs, pipes, filters
-application/  → use-cases, ports, mappers  
-domain/       → entities, value-objects, regras
-infra/        → db (Prisma), providers, messaging
+src/
+├── interfaces/     # Controllers, DTOs, Filters
+├── application/    # Use Cases, Ports, Mappers
+├── domain/         # Entities, Value Objects, Rules
+└── infra/         # Database, Providers, Messaging
 ```
 
-### Fluxo de Pagamento
+### Tecnologias
 
-```mermaid
-graph LR
-    A[Cliente] --> B[API]
-    B --> C[Use Case]
-    C --> D[Domain]
-    C --> E[Repository]
-    C --> F[Provider]
-    F --> G[Mercado Pago]
-    C --> H[Event Bus]
-    H --> I[RabbitMQ]
-```
+- **Framework**: NestJS
+- **Database**: PostgreSQL + Prisma ORM
+- **Messaging**: RabbitMQ
+- **Observability**: OpenTelemetry + Jaeger
+- **Testing**: Jest + Supertest
+- **Container**: Docker + Docker Compose
 
-## 🛠️ Scripts Disponíveis
+## 📊 Banco de Dados
+
+### Modelos Principais
+
+- **Payment**: Gestão de pagamentos (PIX/Cartão)
+- **IdempotencyKey**: Controle de idempotência
+
+### Comandos Úteis
 
 ```bash
-# Desenvolvimento
-pnpm dev                 # Inicia API em modo watch
-pnpm build              # Build da aplicação
-pnpm lint               # Lint em todos os workspaces
-pnpm format             # Formata código com Prettier
-pnpm type-check         # Verificação de tipos TypeScript
-pnpm clean              # Remove arquivos compilados
+# Visualizar dados
+npx prisma studio --port 5555
 
-# Testes
-pnpm test               # Testes unitários
-pnpm test:e2e           # Testes end-to-end
+# Resetar banco
+npx prisma migrate reset
 
-# Docker
-pnpm docker:up          # Sobe todos os serviços
-pnpm docker:down        # Para todos os serviços
-
-# Banco de dados
-pnpm prisma:migrate     # Executa migrações
-pnpm prisma:seed        # Popula banco com dados de teste
-
-# Exportação
-pnpm export:ndjson      # Exporta pagamentos em NDJSON
-pnpm export:parquet     # Exporta pagamentos em Parquet
+# Aplicar mudanças no schema
+npx prisma db push
 ```
 
-## 🔧 Serviços Docker
+## 🔧 Serviços Disponíveis
 
 | Serviço | Porta | Descrição |
 |---------|-------|-----------|
 | API | 3000 | Aplicação principal |
-| Postgres | 5432 | Banco de dados |
+| PostgreSQL | 5433 | Banco de dados |
 | RabbitMQ | 5672 | Mensageria |
-| Jaeger | 16686 | Observabilidade |
-| Temporal | 7233 | Orquestração (opcional) |
+| RabbitMQ Management | 15672 | Interface web |
+| Jaeger | 16686 | Tracing |
+| Prisma Studio | 5555 | Interface do banco |
 
-## 📊 API Endpoints
+## 📋 Histórias Implementadas
 
-### Pagamentos
+### ✅ História 0.3 - Configuração de Banco de Dados
 
-- `POST /api/payment` - Criar pagamento
-- `GET /api/payment` - Listar pagamentos
-- `GET /api/payment/{id}` - Buscar por ID
-- `PUT /api/payment/{id}` - Atualizar pagamento
+**Critérios de Aceitação:**
+- ✅ docker-compose.yml com serviço postgres
+- ✅ Prisma configurado com schema inicial
+- ✅ Script pnpm prisma:migrate dev
 
-### Webhooks
+**Funcionalidades:**
+- PostgreSQL 15 Alpine configurado
+- Schema com modelos Payment e IdempotencyKey
+- Índices otimizados para performance
+- Scripts de migração e seed
+- Configuração de ambiente completa
 
-- `POST /api/payment/webhook/mercado-pago` - Webhook Mercado Pago
-
-### Exportação
-
-- `GET /api/payment/export` - Exportar dados
-
-## 🧪 Testando a API
-
-### 1. Criar pagamento PIX
+## 🧪 Testes
 
 ```bash
-curl -X POST http://localhost:3000/api/payment \
-  -H "Content-Type: application/json" \
-  -d '{
-    "cpf": "12345678901",
-    "amount": 100.50,
-    "description": "Pagamento teste PIX",
-    "paymentMethod": "PIX"
-  }'
+# Testes unitários
+pnpm test
+
+# Testes de integração
+pnpm test:e2e
+
+# Cobertura de código
+pnpm test:cov
 ```
 
-### 2. Criar pagamento Cartão
+## 📚 Documentação
 
-```bash
-curl -X POST http://localhost:3000/api/payment \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: test-key-123" \
-  -d '{
-    "cpf": "12345678901", 
-    "amount": 250.00,
-    "description": "Pagamento teste Cartão",
-    "paymentMethod": "CREDIT_CARD"
-  }'
-```
-
-### 3. Listar pagamentos
-
-```bash
-curl "http://localhost:3000/api/payment?status=PENDING&page=1&limit=10"
-```
-
-## 🔍 Observabilidade
-
-- **Logs estruturados** em JSON
-- **Tracing** com OpenTelemetry
-- **Jaeger UI**: http://localhost:16686
-- **Health Check**: http://localhost:3000/health
-
-## 📈 Métricas
-
-- **Health**: http://localhost:3000/health
-- **Métricas**: http://localhost:3000/metrics (opcional)
+- [Configuração do Banco](docs/database-setup.md)
+- [Clean Architecture](docs/adr-001-clean-architecture.md)
+- [Máquina de Estados](docs/adr-002-state-machine.md)
+- [Decisões de Banco](docs/adr-003-database.md)
 
 ## 🚀 Deploy
 
-### Docker Compose (Produção)
+### Docker Compose
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d
+# Subir todos os serviços
+docker compose up -d
+
+# Parar serviços
+docker compose down
+
+# Ver logs
+docker compose logs -f
 ```
 
-### Kubernetes
+### Variáveis de Ambiente
 
-```bash
-kubectl apply -f k8s/
-```
-
+Copie o arquivo `.env.example` para `.env` e configure as variáveis necessárias.
 
 ## 🤝 Contribuição
 
 1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/nova-funcionalidade`)
-3. Commit suas mudanças (`git commit -m 'feat: adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/nova-funcionalidade`)
+2. Crie uma branch para sua feature
+3. Commit suas mudanças
+4. Push para a branch
 5. Abra um Pull Request
 
 ## 📄 Licença
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-
----
-
-**Desenvolvido com ❤️ seguindo Clean Code e Clean Architecture**

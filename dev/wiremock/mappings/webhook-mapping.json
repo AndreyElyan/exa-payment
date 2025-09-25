@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/webhook"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "id": "{{randomValue length=10 type='ALPHANUMERIC'}}",
+      "live_mode": false,
+      "type": "payment",
+      "date_created": "{{now format='yyyy-MM-ddTHH:mm:ss.SSSZ'}}",
+      "data": {
+        "id": "{{jsonPath request.body '$.data.id'}}"
+      }
+    }
+  }
+}
