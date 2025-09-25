@@ -1,0 +1,22 @@
+{
+  "extends": "./packages/config/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "@exa-payment/config": ["./packages/config"],
+      "@exa-payment/contracts": ["./packages/contracts"]
+    }
+  },
+  "include": [],
+  "references": [
+    {
+      "path": "./apps/api"
+    },
+    {
+      "path": "./packages/config"
+    },
+    {
+      "path": "./packages/contracts"
+    }
+  ]
+}
