@@ -34,3 +34,4 @@ model IdempotencyKey {
   @@index([key, expiresAt])
   @@index([expiresAt])
 }
+

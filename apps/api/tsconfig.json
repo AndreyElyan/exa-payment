@@ -23,7 +23,7 @@
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "noEmit": true,
+    "noEmit": false,
     "removeComments": true,
     "importHelpers": true,
     "experimentalDecorators": true,
