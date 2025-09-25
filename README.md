@@ -18,14 +18,19 @@ git clone <repo-url>
 cd exa-payment
 pnpm install
 
-# 2. Suba os serviços (Postgres, RabbitMQ, etc.)
+# 2. Se houver erro de tslib, limpe o cache:
+pnpm store prune
+rm -rf node_modules
+pnpm install
+
+# 3. Suba os serviços (Postgres, RabbitMQ, etc.)
 pnpm docker:up
 
-# 3. Execute migrações e seed
+# 4. Execute migrações e seed
 pnpm prisma:migrate
 pnpm prisma:seed
 
-# 4. Inicie a API
+# 5. Inicie a API
 pnpm dev
 ```
 
@@ -78,6 +83,7 @@ pnpm build              # Build da aplicação
 pnpm lint               # Lint em todos os workspaces
 pnpm format             # Formata código com Prettier
 pnpm type-check         # Verificação de tipos TypeScript
+pnpm clean              # Remove arquivos compilados
 
 # Testes
 pnpm test               # Testes unitários
@@ -184,13 +190,6 @@ docker compose -f docker-compose.prod.yml up -d
 kubectl apply -f k8s/
 ```
 
-## 📚 Documentação
-
-- [ADR-001: Clean Architecture](./docs/adr-001-clean-architecture.md)
-- [ADR-002: Máquina de Estados](./docs/adr-002-state-machine.md)
-- [ADR-003: Prisma + Postgres](./docs/adr-003-database.md)
-- [Deploy GKE](./docs/deploy-gke.md)
-- [BigQuery Integration](./docs/bq-load.md)
 
 ## 🤝 Contribuição
 

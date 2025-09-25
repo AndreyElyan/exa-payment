@@ -22,13 +22,26 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
+    "rootDir": "./src",
+    "noEmit": true,
     "removeComments": true,
     "importHelpers": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "resolveJsonModule": true,
-    "baseUrl": "./"
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/interfaces/*": ["src/interfaces/*"],
+      "@/application/*": ["src/application/*"],
+      "@/domain/*": ["src/domain/*"],
+      "@/infra/*": ["src/infra/*"],
+      "@/config/*": ["src/config/*"],
+      "@/common/*": ["src/common/*"],
+      "@exa-payment/config": ["../../packages/config"],
+      "@exa-payment/contracts": ["../../packages/contracts"]
+    }
   },
-  "include": ["**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "**/*.test.ts"]
 }

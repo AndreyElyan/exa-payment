@@ -8,6 +8,8 @@
     "packages/*"
   ],
   "scripts": {
+    "setup": "node scripts/setup.js",
+    "clean": "node scripts/clean.js",
     "dev": "pnpm --filter api dev",
     "build": "pnpm --filter api build",
     "lint": "pnpm -r lint",
@@ -26,7 +28,8 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0",
     "prettier": "^3.0.0",
-    "eslint": "^8.0.0"
+    "eslint": "^8.0.0",
+    "tslib": "^2.6.0"
   },
   "engines": {
     "node": ">=18.0.0",
