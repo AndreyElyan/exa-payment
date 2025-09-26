@@ -1,45 +1,64 @@
-.PHONY: help install dev build test test-e2e lint format clean docker-up docker-down db-migrate db-seed
+.PHONY: help install dev build test test-e2e lint format clean docker-up docker-down db-migrate db-seed start-app debug
 
 help: ## Mostra esta ajuda
 	@echo "Comandos disponíveis:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 install: ## Instala todas as dependências
-	pnpm install
+	npm install
 
 dev: ## Roda todos os apps em modo desenvolvimento
-	pnpm dev
+	npm run dev
+
+start-app: ## Inicia a API em modo desenvolvimento
+	npm run docker:up
+	npm install
+	npx nest start api --watch
+
+debug: ## Inicia a API em modo debug
+	npm run docker:up
+	npm install
+	npx nest start api --debug
 
 build: ## Build de todos os projetos
-	pnpm build
+	npm run build
 
-test: ## Executa testes unitários
-	pnpm test
+test: ## Executa todos os testes
+	npm run test
+
+test-unit: ## Executa testes unitários
+	npm run test:unit
 
 test-e2e: ## Executa testes end-to-end
-	pnpm test:e2e
+	npm run test:e2e
+
+test-cov: ## Executa testes com cobertura
+	npm run test:cov
+
+test-watch: ## Executa testes em modo watch
+	npm run test:watch
 
 lint: ## Executa lint em todos os projetos
-	pnpm lint
+	npm run lint
 
 format: ## Formata código com Prettier
-	pnpm format
+	npm run format
 
 clean: ## Limpa caches e builds
-	pnpm clean
-	turbo clean
+	rm -rf dist
+	rm -rf node_modules/.cache
 
 docker-up: ## Sobe infraestrutura local
-	pnpm docker:up
+	npm run docker:up
 
 docker-down: ## Para infraestrutura local
-	pnpm docker:down
+	npm run docker:down
 
 db-migrate: ## Executa migrações do banco
-	pnpm db:migrate
+	cd apps/api && npx prisma migrate dev
 
 db-seed: ## Popula banco com dados de teste
-	pnpm db:seed
+	cd apps/api && npx prisma db seed
 
 setup: install docker-up db-migrate db-seed ## Setup completo do ambiente
 
