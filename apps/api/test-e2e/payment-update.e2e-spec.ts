@@ -265,7 +265,7 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
         .expect(404);
 
       expect(response.body).toMatchObject({
-        code: "VALIDATION_ERROR",
+        code: "NOT_FOUND",
         message: "Payment not found",
       });
     });

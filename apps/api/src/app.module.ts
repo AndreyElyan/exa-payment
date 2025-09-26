@@ -9,6 +9,7 @@ import { IdempotencyService } from "./domain/services/idempotency.service";
 import { DomainEventService } from "./domain/services/domain-event.service";
 import { PaymentRepository } from "./application/ports/payment.repository.port";
 import { PaymentProvider } from "./application/ports/payment-provider.port";
+import { GlobalExceptionFilter } from "./common/filters/global-exception.filter";
 
 @Module({
   imports: [],
@@ -27,6 +28,7 @@ import { PaymentProvider } from "./application/ports/payment-provider.port";
     DomainEventService,
     CreatePaymentUseCase,
     UpdatePaymentUseCase,
+    GlobalExceptionFilter,
   ],
 })
 export class AppModule {}

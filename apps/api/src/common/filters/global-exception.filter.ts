@@ -4,6 +4,7 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
+  NotFoundException,
 } from "@nestjs/common";
 import { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
@@ -36,6 +37,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === "string") {
         errorResponse = this.mapStringResponse(exceptionResponse, traceId);
+      } else if (exception instanceof NotFoundException) {
+        errorResponse = {
+          code: "NOT_FOUND",
+          message: exception.message,
+          traceId,
+        };
       } else {
         errorResponse = this.mapObjectResponse(
           exceptionResponse as any,

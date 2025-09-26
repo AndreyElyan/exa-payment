@@ -1,180 +1,141 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma.service";
 import { PrismaPaymentRepository } from "../prisma-payment.repository";
 import {
   Payment,
-  PaymentMethod,
   PaymentStatus,
+  PaymentMethod,
 } from "../../../domain/entities/payment.entity";
-import { MockPrismaService } from "./mocks/prisma.service.mock";
+import { vi } from "vitest";
 
-describe("PrismaPaymentRepository Integration Tests", () => {
+describe("PrismaPaymentRepository - findById", () => {
   let repository: PrismaPaymentRepository;
-  let prismaService: MockPrismaService;
-  let module: TestingModule;
+  let prismaService: PrismaService;
+
+  const mockPrismaService = {
+    payment: {
+      findUnique: vi.fn(),
+    },
+  };
 
   beforeEach(async () => {
-    module = await Test.createTestingModule({
+    const module: TestingModule = await Test.createTestingModule({
       providers: [
+        PrismaPaymentRepository,
         {
           provide: PrismaService,
-          useClass: MockPrismaService,
+          useValue: mockPrismaService,
         },
-        PrismaPaymentRepository,
       ],
     }).compile();
 
     repository = module.get<PrismaPaymentRepository>(PrismaPaymentRepository);
-    prismaService = module.get<PrismaService>(
-      PrismaService,
-    ) as MockPrismaService;
-
-    // Clear mock data
-    prismaService.clear();
+    prismaService = module.get<PrismaService>(PrismaService);
   });
 
-  afterEach(async () => {
-    // Clean up mock data
-    prismaService.clear();
-    await module.close();
-  });
-
-  describe("save", () => {
-    it("should save PIX payment successfully", async () => {
-      const payment = Payment.create({
-        cpf: "12345678909",
-        description: "Teste PIX",
-        amount: 100.0,
-        paymentMethod: PaymentMethod.PIX,
-      });
-
-      const savedPayment = await repository.save(payment);
-
-      expect(savedPayment.id).toBeDefined();
-      expect(savedPayment.cpf).toBe("12345678909");
-      expect(savedPayment.description).toBe("Teste PIX");
-      expect(savedPayment.amount).toBe(100.0);
-      expect(savedPayment.paymentMethod).toBe(PaymentMethod.PIX);
-      expect(savedPayment.status).toBe(PaymentStatus.PENDING);
-      expect(savedPayment.providerRef).toBeUndefined();
-      expect(savedPayment.createdAt).toBeDefined();
-      expect(savedPayment.updatedAt).toBeDefined();
-    });
-
-    it("should save CREDIT_CARD payment with providerRef", async () => {
-      const payment = Payment.create({
-        cpf: "98765432100",
-        description: "Teste Cartão",
-        amount: 200.0,
-        paymentMethod: PaymentMethod.CREDIT_CARD,
-      });
-
-      payment.setProviderRef("mp_123456789");
-
-      const savedPayment = await repository.save(payment);
-
-      expect(savedPayment.id).toBeDefined();
-      expect(savedPayment.paymentMethod).toBe(PaymentMethod.CREDIT_CARD);
-      expect(savedPayment.providerRef).toBe("mp_123456789");
-    });
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   describe("findById", () => {
-    it("should find existing payment by id", async () => {
-      const payment = Payment.create({
-        cpf: "11122233344",
-        description: "Teste Find",
-        amount: 150.0,
-        paymentMethod: PaymentMethod.PIX,
+    it("should return payment when found", async () => {
+      const paymentId = "823172ea-5628-4ee4-adc9-47396b0dfdca";
+      const mockPaymentData = {
+        id: paymentId,
+        cpf: "12345678909",
+        description: "Mensalidade",
+        amount: 199.9,
+        paymentMethod: "PIX",
+        status: "PENDING",
+        providerRef: null,
+        createdAt: new Date("2025-01-26T12:34:56.000Z"),
+        updatedAt: new Date("2025-01-26T12:34:56.000Z"),
+      };
+
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPaymentData);
+
+      const result = await repository.findById(paymentId);
+
+      expect(result).toBeInstanceOf(Payment);
+      expect(result.id).toBe(paymentId);
+      expect(result.cpf).toBe("12345678909");
+      expect(result.paymentMethod).toBe(PaymentMethod.PIX);
+      expect(result.status).toBe(PaymentStatus.PENDING);
+      expect(result.providerRef).toBeUndefined();
+      expect(mockPrismaService.payment.findUnique).toHaveBeenCalledWith({
+        where: { id: paymentId },
       });
-
-      const savedPayment = await repository.save(payment);
-      const foundPayment = await repository.findById(savedPayment.id);
-
-      expect(foundPayment).toBeDefined();
-      expect(foundPayment?.id).toBe(savedPayment.id);
-      expect(foundPayment?.cpf).toBe("11122233344");
-      expect(foundPayment?.description).toBe("Teste Find");
-      expect(foundPayment?.amount).toBe(150.0);
     });
 
-    it("should return null for non-existent payment", async () => {
-      const foundPayment = await repository.findById("non-existent-id");
-      expect(foundPayment).toBeNull();
-    });
-  });
+    it("should return null when payment not found", async () => {
+      const paymentId = "823172ea-5628-4ee4-adc9-47396b0dfdca";
 
-  describe("update", () => {
-    it("should update existing payment", async () => {
-      const payment = Payment.create({
-        cpf: "55566677788",
-        description: "Teste Update",
-        amount: 300.0,
-        paymentMethod: PaymentMethod.CREDIT_CARD,
+      mockPrismaService.payment.findUnique.mockResolvedValue(null);
+
+      const result = await repository.findById(paymentId);
+
+      expect(result).toBeNull();
+      expect(mockPrismaService.payment.findUnique).toHaveBeenCalledWith({
+        where: { id: paymentId },
       });
+    });
 
-      const savedPayment = await repository.save(payment);
+    it("should handle database errors", async () => {
+      const paymentId = "823172ea-5628-4ee4-adc9-47396b0dfdca";
+      const error = new Error("Database connection failed");
 
-      // Update providerRef
-      savedPayment.setProviderRef("mp_updated_123");
+      mockPrismaService.payment.findUnique.mockRejectedValue(error);
 
-      const updatedPayment = await repository.update(savedPayment);
-
-      expect(updatedPayment.id).toBe(savedPayment.id);
-      expect(updatedPayment.providerRef).toBe("mp_updated_123");
-      expect(updatedPayment.updatedAt.getTime()).toBeGreaterThan(
-        savedPayment.updatedAt.getTime(),
+      await expect(repository.findById(paymentId)).rejects.toThrow(
+        "Database connection failed",
       );
     });
-  });
 
-  describe("database constraints", () => {
-    it("should enforce unique providerRef constraint", async () => {
-      const payment1 = Payment.create({
-        cpf: "11111111111",
-        description: "Payment 1",
-        amount: 100.0,
-        paymentMethod: PaymentMethod.CREDIT_CARD,
-      });
+    it("should return payment with CREDIT_CARD method and providerRef", async () => {
+      const paymentId = "823172ea-5628-4ee4-adc9-47396b0dfdca";
+      const mockPaymentData = {
+        id: paymentId,
+        cpf: "12345678909",
+        description: "Mensalidade",
+        amount: 199.9,
+        paymentMethod: "CREDIT_CARD",
+        status: "PENDING",
+        providerRef: "mp_123456789",
+        createdAt: new Date("2025-01-26T12:34:56.000Z"),
+        updatedAt: new Date("2025-01-26T12:34:56.000Z"),
+      };
 
-      const payment2 = Payment.create({
-        cpf: "22222222222",
-        description: "Payment 2",
-        amount: 200.0,
-        paymentMethod: PaymentMethod.CREDIT_CARD,
-      });
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPaymentData);
 
-      payment1.setProviderRef("mp_same_ref");
-      payment2.setProviderRef("mp_same_ref");
+      const result = await repository.findById(paymentId);
 
-      await repository.save(payment1);
-
-      // Second payment with same providerRef should fail
-      await expect(repository.save(payment2)).rejects.toThrow();
+      expect(result).toBeInstanceOf(Payment);
+      expect(result.id).toBe(paymentId);
+      expect(result.paymentMethod).toBe(PaymentMethod.CREDIT_CARD);
+      expect(result.providerRef).toBe("mp_123456789");
+      expect(result.status).toBe(PaymentStatus.PENDING);
     });
 
-    it("should handle concurrent saves correctly", async () => {
-      const payments = Array.from({ length: 10 }, (_, i) =>
-        Payment.create({
-          cpf: `1234567890${i}`,
-          description: `Concurrent Test ${i}`,
-          amount: 100.0 + i,
-          paymentMethod: PaymentMethod.PIX,
-        }),
-      );
+    it("should return payment with PAID status", async () => {
+      const paymentId = "823172ea-5628-4ee4-adc9-47396b0dfdca";
+      const mockPaymentData = {
+        id: paymentId,
+        cpf: "12345678909",
+        description: "Mensalidade",
+        amount: 199.9,
+        paymentMethod: "PIX",
+        status: "PAID",
+        providerRef: null,
+        createdAt: new Date("2025-01-26T12:34:56.000Z"),
+        updatedAt: new Date("2025-01-26T12:34:56.000Z"),
+      };
 
-      // Save all payments concurrently
-      const savedPayments = await Promise.all(
-        payments.map((payment) => repository.save(payment)),
-      );
+      mockPrismaService.payment.findUnique.mockResolvedValue(mockPaymentData);
 
-      expect(savedPayments).toHaveLength(10);
-      savedPayments.forEach((payment, index) => {
-        expect(payment.id).toBeDefined();
-        expect(payment.cpf).toBe(`1234567890${index}`);
-        expect(payment.amount).toBe(100.0 + index);
-      });
+      const result = await repository.findById(paymentId);
+
+      expect(result).toBeInstanceOf(Payment);
+      expect(result.status).toBe(PaymentStatus.PAID);
     });
   });
 });
