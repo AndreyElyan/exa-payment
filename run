@@ -81,27 +81,27 @@ build_app () {
 
 test_app () {
     echo "$ICON Executando todos os testes..."
-    npm run test
+    DATABASE_URL=postgresql://app:app@localhost:5434/payments npm run test
 }
 
 test_unit () {
     echo "$ICON Executando testes unitários..."
-    npm run test:unit
+    DATABASE_URL=postgresql://app:app@localhost:5434/payments npm run test:unit
 }
 
 test_e2e () {
     echo "$ICON Executando testes e2e..."
-    npm run test:e2e
+    DATABASE_URL=postgresql://app:app@localhost:5434/payments npm run test:e2e
 }
 
 test_coverage () {
     echo "$ICON Executando testes com cobertura..."
-    npm run test:cov
+    DATABASE_URL=postgresql://app:app@localhost:5434/payments npm run test:cov
 }
 
 test_watch () {
     echo "$ICON Executando testes em modo watch..."
-    npm run test:watch
+    DATABASE_URL=postgresql://app:app@localhost:5434/payments npm run test:watch
 }
 
 lint_app () {

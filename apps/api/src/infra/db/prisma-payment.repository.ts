@@ -1,11 +1,15 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from './prisma.service';
-import { PaymentRepository } from '../../application/ports/payment.repository.port';
-import { Payment, PaymentMethod, PaymentStatus } from '../../domain/entities/payment.entity';
+import { Injectable, Inject } from "@nestjs/common";
+import { PrismaService } from "./prisma.service";
+import { PaymentRepository } from "../../application/ports/payment.repository.port";
+import {
+  Payment,
+  PaymentMethod,
+  PaymentStatus,
+} from "../../domain/entities/payment.entity";
 
 @Injectable()
 export class PrismaPaymentRepository implements PaymentRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async save(payment: Payment): Promise<Payment> {
     const data = {

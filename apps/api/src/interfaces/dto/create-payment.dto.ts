@@ -1,5 +1,14 @@
-import { IsString, IsNumber, IsEnum, IsNotEmpty, Min, Max, Length } from 'class-validator';
-import { PaymentMethod } from '../../domain/entities/payment.entity';
+import {
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsNotEmpty,
+  Min,
+  Max,
+  Length,
+  IsIn,
+} from "class-validator";
+import { PaymentMethod } from "../../domain/entities/payment.entity";
 
 export class CreatePaymentDto {
   @IsString()
@@ -17,6 +26,7 @@ export class CreatePaymentDto {
   @Max(9999999999.99)
   amount!: number;
 
-  @IsEnum(PaymentMethod)
+  @IsString()
+  @IsIn(["PIX", "CREDIT_CARD"])
   paymentMethod!: PaymentMethod;
 }
