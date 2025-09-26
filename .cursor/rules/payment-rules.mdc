@@ -1,0 +1,436 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+
+# Pitch rápido (o que te destaca)
+
+* **Clean + DDD leve**: “payment” como agregado + portas/adapters (Strategy para provedores de pagamento).
+* **Idempotência + máquina de estados**: evita duplicidade e mostra maturidade.
+* **Mensageria local** (RabbitMQ) para eventos de domínio, simulando microserviços.
+* **Observabilidade** (OpenTelemetry → console/Jaeger) e **healthchecks** prontos.
+* **Mercado Pago**: dois modos sem custo:
+
+  1. **Stub local** (WireMock/Prism embutido) para validação offline.
+  2. **Sandbox oficial** (token de teste) opcional.
+* **Temporal opcional via docker-compose** (ou fallback BullMQ/Redis) para orquestração resiliente de cartão.
+* **Testes**: unit (Jest), e2e (Jest + supertest) e *opcional* Cypress com mini-UI de admin.
+* **Container first**: `docker compose up` e pronto.
+* **Export BigQuery-friendly**: NDJSON/Parquet local para “simular” analytics.
+
+---
+
+# Backlog (épicos, histórias, critérios)
+
+## Épico: Gestão de Pagamentos
+
+
+
+**User Story 1 — Criar pagamento (PIX/Cartão)**
+
+* Como operador, quero criar um pagamento para registrar a cobrança.
+* **AC (Gherkin)**
+
+  * DADO payload válido (cpf, amount, description, paymentMethod)
+  * QUANDO POST `/api/payment`
+  * ENTÃO 201 + body com `id`, `status=PENDING`, timestamps
+  * E SE `paymentMethod=PIX` **não** chama provedor
+  * E SE `paymentMethod=CREDIT_CARD` inicia fluxo Mercado Pago (stub/sandbox)
+  * E com `Idempotency-Key` igual, chamadas repetidas retornam o mesmo pagamento (200/201)
+
+**User Story 2 — Atualizar pagamento**
+
+* PUT `/api/payment/{id}`
+* **AC**
+
+  * Permite atualizar somente campos permitidos (ex.: `status` com regras de transição válidas)
+  * 400 para transições inválidas (ex.: `PAID` → `PENDING`)
+
+**User Story 3 — Buscar por ID**
+
+* GET `/api/payment/{id}`
+* **AC**
+
+  * 200 com pagamento completo; 404 se não existir
+
+**User Story 4 — Listar com filtros**
+
+* GET `/api/payment?cpf&paymentMethod&status&page&limit`
+* **AC**
+
+  * Paginação estável, ordenação por `createdAt` desc
+  * Filtros combináveis
+
+**User Story 5 — Webhook Mercado Pago**
+
+* POST `/api/payment/webhook/mercado-pago`
+* **AC**
+
+  * Verifica assinatura/secreto (modo sandbox: aceita token; modo stub: chave local)
+  * Atualiza status para `PAID` ou `FAIL`
+  * Publica evento `PaymentStatusChanged`
+
+**User Story 6 — Export Analytics**
+
+* Como analista, quero exportar pagamentos em **NDJSON** (e Parquet opcional) para futura carga em BigQuery.
+* **AC**
+
+  * GET `/api/payment/export?from&to&format=ndjson|parquet` → arquivo local em `/exports`
+
+**User Story 7 (opcional) — Orquestração resiliente**
+
+* Com Temporal (ou BullMQ): workflow garante reexecução/polling, *timeouts*, retentativas e idempotência.
+
+---
+
+# Domínio, estados e regras
+
+## Agregado `Payment`
+
+Campos: `id`, `cpf`, `description`, `amount`, `paymentMethod (PIX|CREDIT_CARD)`, `status (PENDING|PAID|FAIL)`, `providerRef`, `createdAt`, `updatedAt`.
+
+## Máquina de estados
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING
+    PENDING --> PAID: confirmação provedor (webhook|polling)
+    PENDING --> FAIL: erro definitivo provedor
+    PAID --> [*]
+    FAIL --> [*]
+```
+
+**Regras-chave**
+
+* `PIX`: cria `PENDING` e para. (Opcional: QR/txid fake no stub para demo.)
+* `CREDIT_CARD`: cria `PENDING` e inicia fluxo com provedor (stub/sandbox).
+* **Idempotência** por `Idempotency-Key` (header) + hash do payload.
+* **CPF** validado por dígitos verificadores (regra BR).
+
+---
+
+# Contrato da API (OpenAPI 3.1 – trecho essencial)
+
+```yaml
+openapi: 3.1.0
+info: { title: Payments API, version: 1.0.0 }
+paths:
+  /api/payment:
+    post:
+      summary: Create payment
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentDTO'
+      responses:
+        '201': { $ref: '#/components/responses/Payment' }
+    get:
+      summary: List payments
+      parameters:
+        - in: query; name: cpf; schema: { type: string }
+        - in: query; name: paymentMethod; schema: { enum: [PIX, CREDIT_CARD] }
+        - in: query; name: status; schema: { enum: [PENDING, PAID, FAIL] }
+        - in: query; name: page; schema: { type: integer, default: 1 }
+        - in: query; name: limit; schema: { type: integer, default: 20 }
+      responses:
+        '200': { description: OK }
+  /api/payment/{id}:
+    get: { summary: Get by id, responses: { '200': { $ref: '#/components/responses/Payment' }, '404': { description: Not Found } } }
+    put:
+      summary: Update payment
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/UpdatePaymentDTO' } } } }
+      responses: { '200': { $ref: '#/components/responses/Payment' } }
+  /api/payment/webhook/mercado-pago:
+    post:
+      summary: Mercado Pago webhook
+      responses: { '204': { description: No Content } }
+components:
+  schemas:
+    CreatePaymentDTO:
+      type: object
+      required: [cpf, amount, description, paymentMethod]
+      properties:
+        cpf: { type: string, pattern: '^\d{11}$' }
+        amount: { type: number, minimum: 0.01 }
+        description: { type: string, maxLength: 255 }
+        paymentMethod: { type: string, enum: [PIX, CREDIT_CARD] }
+    UpdatePaymentDTO:
+      type: object
+      properties:
+        status: { type: string, enum: [PENDING, PAID, FAIL] }
+  responses:
+    Payment:
+      description: Payment
+```
+
+---
+
+# Arquitetura (Clean + Ports & Adapters)
+
+```mermaid
+flowchart LR
+  UI[CLI/HTTP Client] --> API[NestJS Controllers]
+  API --> UC[Use Cases (Application)]
+  UC --> DOM[Domain (Entities, Rules)]
+  UC --> PORTS[(Ports)]
+  PORTS --> REPO[PaymentRepository (Prisma/Postgres)]
+  PORTS --> PROV[PaymentProvider (Strategy)]
+  UC --> EVT[(Domain Events Bus)]
+  EVT --> MQ[RabbitMQ (local)]
+  API --> WEBHOOK[Webhook Controller]
+  subgraph Infra
+    PRISMA[(Postgres)]
+    STUB[(MercadoPago Stub Server)]
+    TEMPORAL[(Temporal/BullMQ opcional)]
+    OTEL[(OTel Collector/Jaeger)]
+  end
+  REPO <--> PRISMA
+  PROV <--> STUB
+  UC <--> TEMPORAL
+  API --> OTEL
+```
+
+**Camadas e pastas**
+
+```
+apps/api
+  src/
+    main.ts
+    app.module.ts
+    interfaces/http/ (controllers, dto, validators, pipes, exception filters)
+    application/ (use-cases, ports, mappers)
+    domain/ (entities, value-objects, services de domínio, events)
+    infra/
+      db/ (prisma client, repositories)
+      providers/
+        mercado-pago/ (adapter real/sandbox)
+        stub/ (adapter local)
+      messaging/ (rabbitmq publisher)
+      workflows/ (temporal|bullmq)
+    config/ (env, config modules)
+    observability/ (otel)
+    common/ (utils: cpf validator, idempotency)
+  test/ (unit)
+  test-e2e/ (e2e supertest)
+packages/contracts (openapi, json-schemas)
+packages/tooling (scripts, eslint, tsconfig)
+dev/ (docker, compose, seed, wiremock/prism configs)
+```
+
+**Porta `PaymentProvider` (Strategy)**
+
+```ts
+export interface PaymentProvider {
+  createCreditCardCharge(input: { amount: number; description: string; idempotencyKey: string }): Promise<{ providerRef: string }>;
+  getStatus(providerRef: string): Promise<'PENDING'|'PAID'|'FAIL'>;
+}
+```
+
+Adapters:
+
+* `MercadoPagoAdapter`: usa sandbox/token **opcional**.
+* `StubAdapter`: responde determinístico (config.yml), sem internet.
+
+**Repository**: `PaymentRepository` (Prisma) com métodos idempotentes.
+
+---
+
+# Persistência (Postgres via Prisma – schema essencial)
+
+```prisma
+model Payment {
+  id            String   @id @default(cuid())
+  cpf           String   @db.VarChar(11)
+  description   String   @db.VarChar(255)
+  amount        Decimal  @db.Decimal(12,2)
+  paymentMethod String   // 'PIX' | 'CREDIT_CARD'
+  status        String   // 'PENDING' | 'PAID' | 'FAIL'
+  providerRef   String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([cpf, paymentMethod, status, createdAt])
+}
+```
+
+---
+
+# Idempotência
+
+* Header **`Idempotency-Key`** obrigatório no POST cartão; opcional em PIX.
+* Tabela `idempotency_keys` (chave + hash do corpo + paymentId + ttl).
+* Filtro de race-condition com `SELECT ... FOR UPDATE` (ou unique constraint + retry).
+
+---
+
+# Segurança & Webhook
+
+* **Validation Pipe** + DTOs com `class-validator`.
+* CPF: validação de dígitos (regra BR).
+* Webhook:
+
+  * `X-Webhook-Secret` (stub) ou `X-Signature` (sandbox) + `tolerance` de tempo.
+  * Sempre responde **204** para evitar replays; processa assíncrono.
+
+---
+
+# Mensageria (bonus microserviços locais)
+
+* `PaymentStatusChanged` publicado no **RabbitMQ** (`payments.events`).
+* Um **consumer-demo** (app separado `apps/consumer`) imprime eventos → demonstra integração assíncrona (Kafka/PubSub “equivalente conceitual”).
+
+---
+
+# Observabilidade
+
+* **OpenTelemetry** Node SDK configurado no Nest (HTTP server/client, Prisma).
+* **Local**: envia para `otel-collector` (docker) e **Jaeger** (docker) ou log no console.
+
+---
+
+# Orquestração (opcional)
+
+* **Temporal** (docker): workflow `CreditCardPaymentWorkflow`:
+
+  * Activity 1: cria `PENDING` + chamada criar preferência.
+  * Activity 2: aguarda confirmação (webhook sinaliza ou polling com backoff).
+  * Activity 3: atualiza status, publica evento.
+* **Fallback**: **BullMQ + Redis** replicando passos com retries/backoff.
+
+---
+
+# Testes
+
+* **Unit (Jest)**: entidades/serviços de domínio, use-cases, validações.
+* **Integração**: repos (Prisma) com Postgres do docker, provider stub.
+* **E2E (Jest + supertest)**: fluxo end-to-end (criar, webhook, listar).
+* **Cypress (opcional)**: mini-UI admin (React Vite) com 2 telas: criar e acompanhar status.
+* **Contract (opcional)**: Pact entre API e consumer demo.
+
+---
+
+# Docker & Dev Experience
+
+**docker-compose.yml (serviços):**
+
+* `api` (Nest)
+* `postgres` (db)
+* `rabbitmq` (mensageria)
+* `wiremock` ou `prism` (stub Mercado Pago)
+* `otel-collector` + `jaeger` (observabilidade)
+* `temporal` + `temporal-ui` (opcional)
+* `redis` (se usar BullMQ)
+
+**Scripts NPM**
+
+* `dev`: `nest start --watch`
+* `lint`: eslint
+* `type-check`: `tsc --noEmit`
+* `test`, `test:cov`, `test:e2e`
+* `docker:up`, `docker:down`, `prisma:migrate`, `prisma:seed`
+* `export:ndjson`, `export:parquet` (gera em `/exports`)
+
+**Git & CI**
+
+* Conventional commits + Husky + lint-staged
+* `Jenkinsfile` simples (build, lint, test, e2e) para mostrar aderência à vaga
+* GitFlow opcional (branches `feature/*`, `release/*`)
+
+---
+
+# Exemplos de código (curtos)
+
+**Validador de CPF (resumo)**
+
+```ts
+export function isValidCPF(cpf: string): boolean {
+  const s = cpf.replace(/\D/g, '');
+  if (!/^\d{11}$/.test(s) || /^(\d)\1{10}$/.test(s)) return false;
+  const calc = (len: number) => {
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += parseInt(s[i]) * (len + 1 - i);
+    const dv = (sum * 10) % 11;
+    return dv === 10 ? 0 : dv;
+  };
+  return calc(9) === +s[9] && calc(10) === +s[10];
+}
+```
+
+**Port/Adapter Strategy (assinatura)**
+
+```ts
+@Injectable()
+export class PaymentService {
+  constructor(
+    private readonly repo: PaymentRepository,
+    @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
+    private readonly events: DomainEventBus,
+  ) {}
+
+  async create(dto: CreatePaymentDto, idemKey?: string) {
+    // valida CPF + amount + method
+    // aplica idempotência
+    const payment = Payment.new(dto); // status PENDING
+    await this.repo.save(payment);
+    if (payment.isCreditCard()) {
+      const { providerRef } = await this.provider.createCreditCardCharge({
+        amount: payment.amount, description: payment.description, idempotencyKey: idemKey ?? payment.id
+      });
+      payment.setProviderRef(providerRef);
+      await this.repo.update(payment);
+    }
+    return payment;
+  }
+}
+```
+
+---
+
+# Roteiro de Demo (para o avaliador)
+
+1. `docker compose up -d`
+2. `pnpm i && pnpm prisma:migrate && pnpm prisma:seed`
+3. `pnpm dev` (API em `http://localhost:3000`)
+4. **PIX**:
+
+   * POST `/api/payment` `{ cpf, amount, description, paymentMethod: "PIX" }` → `PENDING`
+5. **Cartão**:
+
+   * Envia POST com `paymentMethod: "CREDIT_CARD"` e `Idempotency-Key`
+   * Recebe `PENDING` + `providerRef`
+   * Dispara webhook fake: POST `/api/payment/webhook/mercado-pago` com payload de sucesso
+   * GET `/api/payment/{id}` → `PAID`
+6. **Listar & Filtros**: GET `/api/payment?cpf=...&status=PAID`
+7. **Eventos**: veja `apps/consumer` logando `PaymentStatusChanged`
+8. **Observabilidade**: visualizar traços no Jaeger (opcional)
+9. **Export**: GET `/api/payment/export?from=...&to=...&format=ndjson` → arquivo em `/exports`
+
+---
+
+# Documentação inclusa (Visibilidade de Impacto)
+
+* **README** (setup 1 minuto, make targets, screenshots)
+* **ADR-001**: Clean Architecture + Ports/Adapters (trade-offs)
+* **ADR-002**: Máquina de estados & idempotência
+* **ADR-003**: Prisma + Postgres (vs TypeORM)
+* **ADR-004**: Temporal vs BullMQ (custo local, robustez)
+* **ADR-005**: Mensageria (RabbitMQ agora, Kafka/GCP PubSub depois)
+* **UPSTREAM**: uma página explicando impacto no negócio (confiabilidade, auditabilidade)
+* **Métricas**: contagem de pagamentos por status + latência (expostos via `/health` e `/metrics` opcional)
+
+---
+
+# Extensões que conectam com a vaga (deixadas prontas)
+
+* **GCP-ready**: `docs/deploy-gke.md` (manifestos k8s/kustomize prontos).
+* **BigQuery**: `docs/bq-load.md` explicando `bq load` a partir de NDJSON exportado.
+* **CI Jenkins**: `Jenkinsfile` com stages (install → lint → typecheck → test → e2e).
+* **Docker/K8s**: manifests para `api`, `postgres`, `rabbitmq`.
