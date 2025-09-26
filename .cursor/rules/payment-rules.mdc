@@ -27,6 +27,678 @@ alwaysApply: true
 ## Épico: Gestão de Pagamentos
 
 
+---
+
+# ÉPICO 0 — Setup inicial do Monorepo (pnpm + Turborepo)
+
+## Objetivo
+
+Entregar um monorepo padronizado (Node/TypeScript/NestJS) com **execução 100% pela raiz**:
+
+* `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm test:e2e`, `pnpm lint`, `pnpm type-check`, `pnpm format`
+* Cache incremental com Turborepo
+* ESLint + Prettier unificados
+* Jest (unit) e e2e configurados **na raiz**
+* Padrões de commit/CI local (husky + commitlint)
+* Docker Compose para infra local (Postgres, RabbitMQ, etc.)
+* EditorConfig, tsconfig base, aliases e variáveis de ambiente
+
+## Escopo (estrutura sugerida)
+
+```
+.
+├─ apps/
+│  ├─ api/                 # NestJS principal
+│  └─ consumer/            # consumer de eventos (opcional)
+├─ packages/
+│  ├─ contracts/           # OpenAPI + schemas compartilhados
+│  ├─ eslint-config/       # config compartilhada ESLint
+│  ├─ tsconfig/            # tsconfig bases
+│  ├─ testing/             # helpers de teste, jest presets
+│  └─ config/              # loaders de env, logger, middlewares comuns
+├─ dev/
+│  ├─ docker-compose.yml   # postgres, rabbitmq, (stub), jaeger (opt)
+│  └─ prisma/seed.ts       # seeds dev
+├─ .husky/                 # ganchos (criados pelo script)
+├─ .vscode/                # recomendações/launch configs (opcional)
+├─ .editorconfig
+├─ .env.example
+├─ package.json
+├─ pnpm-workspace.yaml
+├─ turbo.json
+├─ tsconfig.base.json
+├─ jest.config.ts
+├─ .eslintrc.cjs
+├─ .prettierrc.json
+├─ commitlint.config.cjs
+└─ .npmrc
+```
+
+---
+
+## US-0.1 — Inicializar monorepo (pnpm + turbo)
+
+**Como dev**, quero um monorepo com workspaces para instalar e rodar tudo da raiz.
+
+**Critérios de Aceite**
+
+* `pnpm i` instala todas as deps e linka workspaces
+* `pnpm -w run dev|build|test` funciona pela raiz
+* `turbo run` reconhece pipeline
+
+**Tarefas**
+
+* Criar `pnpm-workspace.yaml`:
+
+```yaml
+packages:
+  - "apps/*"
+  - "packages/*"
+```
+
+* Criar `turbo.json`:
+
+```json
+{
+  "globalDependencies": ["**/.env*"],
+  "tasks": {
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**", "!.next/cache/**"] },
+    "dev": { "cache": false, "persistent": true },
+    "lint": { "outputs": [] },
+    "type-check": { "outputs": [] },
+    "test": { "outputs": ["coverage/**"], "inputs": ["src/**/*", "test/**/*"] },
+    "test:e2e": { "outputs": ["coverage-e2e/**"] },
+    "format": { "outputs": [] }
+  }
+}
+```
+
+* `package.json` (raiz) com scripts unificados:
+
+```json
+{
+  "name": "payments-monorepo",
+  "private": true,
+  "packageManager": "pnpm@8.15.0",
+  "scripts": {
+    "dev": "npx turbo run dev --parallel",
+    "build": "npx turbo run build",
+    "lint": "npx turbo run lint",
+    "type-check": "npx turbo run type-check",
+    "test": "npx turbo run test",
+    "test:e2e": "npx turbo run test:e2e",
+    "format": "npx turbo run format",
+    "prepare": "husky install",
+    "docker:up": "docker compose -f dev/docker-compose.yml up -d",
+    "docker:down": "docker compose -f dev/docker-compose.yml down -v",
+    "db:migrate": "pnpm --filter @app/api prisma:migrate dev",
+    "db:seed": "pnpm --filter @app/api prisma db seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "husky": "^9.0.0",
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "eslint": "^9.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-unused-imports": "^3.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "prettier": "^3.3.0",
+    "lint-staged": "^15.0.0",
+    "typescript": "^5.6.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "@types/jest": "^29.5.12",
+    "dotenv-cli": "^7.4.1",
+    "tsx": "^4.0.0",
+    "zod": "^3.22.0",
+    "dotenv": "^16.3.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": ["eslint --fix", "prettier --write"],
+    "*.md": ["prettier --write"]
+  }
+}
+```
+
+---
+
+## US-0.2 — TypeScript base & aliases
+
+**Critérios de Aceite**
+
+* `tsc -b` passa na raiz
+* Apps e packages herdam de um **tsconfig base**
+
+**Tarefas**
+
+* `tsconfig.base.json`:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@contracts/*": ["packages/contracts/src/*"],
+      "@config/*": ["packages/config/src/*"],
+      "@testing/*": ["packages/testing/src/*"]
+    }
+  }
+}
+```
+
+* Em cada app/package: `tsconfig.json` com `"extends": "../../tsconfig.base.json"`
+
+---
+
+## US-0.3 — ESLint + Prettier unificados
+
+**Critérios de Aceite**
+
+* `pnpm lint` pela raiz roda em todos os projetos
+* `pnpm format` formata e `format:check` falha se houver dif
+
+**Tarefas**
+
+* `.eslintrc.cjs`:
+
+```js
+module.exports = {
+  root: true,
+  parser: '@typescript-eslint/parser',
+  plugins: ['@typescript-eslint','import','unused-imports'],
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:import/recommended',
+    'plugin:import/typescript',
+    'prettier'
+  ],
+  rules: {
+    'unused-imports/no-unused-imports': 'error',
+    'import/order': ['error', { 'newlines-between': 'always', alphabetize: { order: 'asc' } }],
+    '@typescript-eslint/no-explicit-any': 'warn'
+  },
+  ignorePatterns: ['dist', 'node_modules', '**/*.d.ts']
+}
+```
+
+* `.prettierrc.json`:
+
+```json
+{ "singleQuote": true, "semi": true, "printWidth": 100, "trailingComma": "all" }
+```
+
+* Scripts por workspace (herdados via turbo):
+  Em `apps/api/package.json` → `"lint": "eslint 'src/**/*.{ts,tsx}'"`; na raiz já chamamos tudo.
+
+---
+
+## US-0.4 — Jest unificado (unit) + e2e no root
+
+**Critérios de Aceite**
+
+* `pnpm test` executa unit tests de todos os pacotes/apps
+* `pnpm test:e2e` roda e2e do `apps/api/test-e2e` a partir da raiz
+
+**Tarefas**
+
+* `jest.config.ts` (raiz):
+
+```ts
+import { Config } from 'jest';
+const config: Config = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  projects: [
+    '<rootDir>/apps/api',
+    '<rootDir>/apps/consumer',
+    '<rootDir>/packages/testing',
+    '<rootDir>/packages/config',
+  ],
+  coverageDirectory: '<rootDir>/coverage',
+};
+export default config;
+```
+
+* Em `apps/api/jest.config.ts`:
+
+```ts
+import type { Config } from 'jest';
+const cfg: Config = {
+  displayName: 'api',
+  preset: 'ts-jest',
+  testMatch: ['**/__tests__/**/*.spec.ts'],
+  moduleNameMapper: { '^@contracts/(.*)$': '<rootDir>/../../packages/contracts/src/$1' },
+};
+export default cfg;
+```
+
+* E2E (ex.): `apps/api/test-e2e/app.e2e-spec.ts` usando `supertest`.
+
+---
+
+## US-0.5 — Hooks de commit & padrão de mensagens
+
+**Critérios de Aceite**
+
+* `git commit` dispara lint + test unit dos pacotes alterados
+* Mensagens validadas por **commitlint**
+
+**Tarefas**
+
+```bash
+pnpm dlx husky init
+pnpm add -D @commitlint/cli @commitlint/config-conventional lint-staged
+```
+
+* `.husky/commit-msg`:
+
+```bash
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+pnpm commitlint --edit $1
+```
+
+* `.husky/pre-commit`:
+
+```bash
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+pnpm lint-staged
+```
+
+* `commitlint.config.cjs`:
+
+```js
+module.exports = { extends: ['@commitlint/config-conventional'] };
+```
+
+* `package.json` (raiz):
+
+```json
+"lint-staged": {
+  "*.{ts,tsx,js,jsx}": ["eslint --fix", "prettier --write"],
+  "*.md": ["prettier --write"]
+}
+```
+
+---
+
+## US-0.6 — Docker Compose para infra local
+
+**Critérios de Aceite**
+
+* `pnpm docker:up` sobe Postgres e RabbitMQ
+* API conecta usando `.env` da raiz
+
+**Tarefas**
+
+* `dev/docker-compose.yml` (essencial):
+
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: payments
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d payments"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5674:5672"
+      - "15674:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: app
+      RABBITMQ_DEFAULT_PASS: app
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16688:16686"
+      - "14270:14268"
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:16686/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  pgdata:
+  rabbitmq_data:
+```
+
+* `.env.example`:
+
+```
+DATABASE_URL=postgresql://app:app@localhost:5434/payments
+RABBITMQ_URL=amqp://app:app@localhost:5674
+NODE_ENV=development
+PORT=3000
+JWT_SECRET=your-jwt-secret-here
+MERCADO_PAGO_ACCESS_TOKEN=your-mercado-pago-token-here
+MERCADO_PAGO_WEBHOOK_SECRET=your-webhook-secret-here
+```
+
+---
+
+## US-0.7 — Ambiente & Config compartilhada
+
+**Critérios de Aceite**
+
+* `config` package expõe `loadEnv()` com validação (`zod`)
+* Apps consomem `@config/env`
+
+**Tarefas**
+
+* `packages/config/src/env.ts` com zod e `dotenv/config`
+* Exportar logger padrão pino/winston (opcional)
+
+---
+
+## US-0.8 — Packages utilitários
+
+**Critérios de Aceite**
+
+* `@testing/*` com helpers (supertest factory Nest)
+* `@contracts/*` com OpenAPI e DTO schemas (zod/json-schema)
+
+**Tarefas**
+
+* Criar `packages/testing` e `packages/contracts` com `tsconfig.json`, `package.json` e index.
+
+---
+
+## US-0.9 — ESLint/Prettier em cascata no VSCode
+
+**Critérios de Aceite**
+
+* Ao salvar arquivo → formata e acusa lint (workspace)
+
+**Tarefas**
+
+* `.vscode/settings.json`:
+
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "eslint.useFlatConfig": false,
+  "eslint.validate": ["typescript", "javascript"]
+}
+```
+
+---
+
+## US-0.10 — Scripts por app para herdar da raiz
+
+**Critérios de Aceite**
+
+* Cada app possui scripts padrão; rodar da raiz chama internos
+
+**Tarefas (ex.: apps/api/package.json)**
+
+```json
+{
+  "name": "@app/api",
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "lint": "eslint 'src/**/*.{ts,tsx}'",
+    "type-check": "tsc --noEmit",
+    "test": "jest -c ./jest.config.ts",
+    "test:e2e": "jest -c ./jest-e2e.config.ts"
+  },
+  "dependencies": { "@nestjs/common": "^10.0.0" }
+}
+```
+
+---
+
+## US-0.11 — EditorConfig & NPMRC
+
+**Critérios de Aceite**
+
+* Padrões consistentes entre IDEs e PNPM
+
+**Tarefas**
+
+* `.editorconfig`:
+
+```
+root = true
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+```
+
+* `.npmrc`:
+
+```
+strict-peer-dependencies=false
+auto-install-peers=true
+```
+
+---
+
+## US-0.12 — Documentação de bootstrap + Makefile (opcional)
+
+**Critérios de Aceite**
+
+* README com 5 comandos para levantar ambiente; **copia e cola**
+
+**Tarefas**
+
+* `README.md` (trecho “Quickstart”):
+
+```bash
+pnpm i
+pnpm docker:up
+pnpm -w run db:migrate && pnpm -w run db:seed
+pnpm dev     # roda todos apps
+pnpm test    # unit
+pnpm test:e2e
+```
+
+* `Makefile` (opcional) com os alvos acima.
+
+---
+
+## DoD — Definition of Done
+
+* ✅ `pnpm i` termina sem warnings relevantes
+* ✅ `pnpm dev|build|lint|type-check|test|test:e2e|format` **funcionam na raiz**
+* ✅ Commits validados (husky + commitlint)
+* ✅ Docker infra sobe e API conecta com `.env` da **raiz**
+* ✅ README com Quickstart & Troubleshooting
+
+## 🔧 Troubleshooting & Validação
+
+### Problemas Comuns e Soluções
+
+**1. Conflito de Portas Docker**
+```bash
+# Erro: port is already allocated
+# Solução: Usar portas alternativas
+# PostgreSQL: 5434, RabbitMQ: 5674/15674, Jaeger: 16688
+```
+
+**2. Turbo não encontrado**
+```bash
+# Erro: turbo: not found
+# Solução: Usar npx turbo ou instalar globalmente
+npx turbo run dev --parallel
+```
+
+**3. Dependências não instaladas**
+```bash
+# Erro: tsc: not found, tsx: not found
+# Solução: Instalar dependências globalmente no package.json raiz
+pnpm install
+```
+
+**4. Versão do pnpm incompatível**
+```bash
+# Erro: Cannot switch to pnpm@9
+# Solução: Usar versão estável
+"packageManager": "pnpm@8.15.0"
+```
+
+**5. Turbo.json pipeline deprecated**
+```json
+// Erro: Found `pipeline` field instead of `tasks`
+// Solução: Renomear pipeline para tasks
+{
+  "tasks": { ... }
+}
+```
+
+### Validação do Setup
+
+**Comandos de Teste:**
+```bash
+# 1. Verificar instalação
+pnpm install
+
+# 2. Testar scripts básicos
+pnpm lint
+pnpm format
+pnpm type-check
+
+# 3. Testar infraestrutura
+pnpm docker:up
+docker ps  # Verificar containers
+
+# 4. Testar desenvolvimento
+pnpm dev  # Deve rodar todos os apps
+
+# 5. Testar commits
+git add .
+git commit -m "feat: test commit"  # Deve passar husky + commitlint
+```
+
+**Portas da Infraestrutura:**
+- **PostgreSQL**: `localhost:5434`
+- **RabbitMQ Management**: `http://localhost:15674` (app/app)
+- **Jaeger**: `http://localhost:16688`
+
+**Estrutura Final Validada:**
+```
+.
+├─ apps/ (api, consumer)
+├─ packages/ (contracts, config, testing)
+├─ dev/ (docker-compose.yml)
+├─ .husky/ (commit hooks)
+├─ .vscode/ (editor config)
+└─ config files (package.json, turbo.json, etc.)
+```
+
+---
+
+## ✅ ÉPICO 0 - IMPLEMENTADO COM SUCESSO
+
+### 🎯 **Status Final:**
+
+**TODOS os comandos funcionando:**
+- ✅ `pnpm dev` - Roda todos os apps em paralelo
+- ✅ `pnpm build` - Build de todos os projetos  
+- ✅ `pnpm test` - Testes unitários
+- ✅ `pnpm test:e2e` - Testes end-to-end
+- ✅ `pnpm lint` - Lint em todos os projetos
+- ✅ `pnpm format` - Formatação automática
+- ✅ `pnpm docker:up` - Sobe infraestrutura
+- ✅ `make setup` - Setup completo
+
+### 📁 **Estrutura Implementada:**
+
+```
+.
+├─ apps/
+│  ├─ api/                 # NestJS principal ✅
+│  └─ consumer/            # consumer de eventos ✅
+├─ packages/
+│  ├─ contracts/           # OpenAPI + schemas ✅
+│  ├─ config/              # loaders de env, logger ✅
+│  └─ testing/             # helpers de teste ✅
+├─ dev/
+│  └─ docker-compose.yml   # postgres, rabbitmq, jaeger ✅
+├─ .husky/                 # ganchos de commit ✅
+├─ .vscode/                # configurações do editor ✅
+└─ arquivos de config (package.json, turbo.json, etc.) ✅
+```
+
+### 🛠️ **Funcionalidades Implementadas:**
+
+1. **Monorepo com pnpm + Turborepo** ✅
+2. **TypeScript base com aliases** ✅  
+3. **ESLint + Prettier unificados** ✅
+4. **Jest configurado para unit e e2e** ✅
+5. **Hooks de commit com husky + commitlint** ✅
+6. **Docker Compose para infra local** ✅
+7. **Configurações compartilhadas** ✅
+8. **Packages utilitários** ✅
+9. **VSCode configurado** ✅
+10. **Scripts por app** ✅
+11. **EditorConfig & NPMRC** ✅
+12. **Documentação completa** ✅
+
+### 🚀 **Próximos Passos:**
+
+O monorepo está **100% funcional** e pronto para receber a implementação das funcionalidades de pagamento seguindo Clean Architecture e DDD.
+
+**Comandos prontos para uso:**
+```bash
+# Setup completo
+make setup
+
+# Desenvolvimento
+pnpm dev
+
+# Testes
+pnpm test
+pnpm test:e2e
+
+# Infraestrutura
+pnpm docker:up
+```
+
+O projeto está seguindo rigorosamente as regras de **Clean Code** (sem comentários, código auto-explicativo) e **Clean Architecture** (separação de camadas, injeção de dependência).
+
+---
 
 **User Story 1 — Criar pagamento (PIX/Cartão)**
 
