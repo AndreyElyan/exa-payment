@@ -5,18 +5,18 @@ export class CreatePaymentDto {
   @IsString()
   @IsNotEmpty()
   @Length(11, 11)
-  cpf: string;
+  cpf!: string;
 
   @IsString()
   @IsNotEmpty()
   @Length(1, 255)
-  description: string;
+  description!: string;
 
   @IsNumber()
   @Min(0.01)
   @Max(9999999999.99)
-  amount: number;
+  amount!: number;
 
   @IsEnum(PaymentMethod)
-  paymentMethod: PaymentMethod;
+  paymentMethod!: PaymentMethod;
 }

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, Inject } from '@nestjs/common';
 import { Payment, PaymentMethod } from '../../domain/entities/payment.entity';
 import { Cpf } from '../../domain/value-objects/cpf.vo';
 import { IdempotencyService } from '../../domain/services/idempotency.service';
@@ -19,8 +19,8 @@ export interface CreatePaymentOutput {
 @Injectable()
 export class CreatePaymentUseCase {
   constructor(
-    private readonly paymentRepository: PaymentRepository,
-    private readonly paymentProvider: PaymentProvider,
+    @Inject('PaymentRepository') private readonly paymentRepository: PaymentRepository,
+    @Inject('PaymentProvider') private readonly paymentProvider: PaymentProvider,
     private readonly idempotencyService: IdempotencyService,
   ) {}
 
@@ -50,7 +50,7 @@ export class CreatePaymentUseCase {
           return { payment: existingPayment!, isNew: false };
         }
       } catch (error) {
-        if (error.message === 'IDEMPOTENCY_KEY_CONFLICT') {
+        if (error instanceof Error && error.message === 'IDEMPOTENCY_KEY_CONFLICT') {
           throw new ConflictException('IDEMPOTENCY_KEY_CONFLICT');
         }
         throw error;

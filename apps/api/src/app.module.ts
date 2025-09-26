@@ -15,11 +15,11 @@ import { PaymentProvider } from './application/ports/payment-provider.port';
     CreatePaymentUseCase,
     PrismaService,
     {
-      provide: PaymentRepository,
+      provide: 'PaymentRepository',
       useClass: PrismaPaymentRepository,
     },
     {
-      provide: PaymentProvider,
+      provide: 'PaymentProvider',
       useClass: StubPaymentProvider,
     },
     IdempotencyService,
