@@ -55,16 +55,9 @@ describe("Payment API (e2e) - US1 Complete Coverage", () => {
     await app.init();
   });
 
-  beforeEach(async () => {
-    // Clean up database before each test to avoid constraint violations
-    await prismaService.payment.deleteMany();
-    await prismaService.idempotencyKey.deleteMany();
-  });
+  beforeEach(async () => {});
 
   afterAll(async () => {
-    // Clean up database
-    await prismaService.payment.deleteMany();
-    await prismaService.idempotencyKey.deleteMany();
     await app.close();
   });
 

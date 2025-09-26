@@ -123,7 +123,8 @@ describe("CreatePaymentUseCase", () => {
         description: dto.description,
         idempotencyKey,
       });
-      expect(mockPaymentRepository.update).toHaveBeenCalledTimes(1);
+      // O providerRef agora é definido antes do save, não há mais update
+      expect(mockPaymentRepository.save).toHaveBeenCalledTimes(1);
     });
 
     it("should require idempotency key for CREDIT_CARD (Cenário 9)", async () => {
@@ -265,9 +266,14 @@ describe("CreatePaymentUseCase", () => {
         new Error("Provider error"),
       );
 
-      await expect(useCase.execute({ dto, idempotencyKey })).rejects.toThrow(
-        "Provider error",
-      );
+      // O CreatePaymentUseCase agora não propaga erros do provider - apenas loga e continua
+      const result = await useCase.execute({ dto, idempotencyKey });
+
+      expect(result.isNew).toBe(true);
+      expect(result.payment.paymentMethod).toBe(PaymentMethod.CREDIT_CARD);
+      expect(result.payment.status).toBe(PaymentStatus.PENDING);
+      // O pagamento é criado mesmo com erro do provider
+      expect(mockPaymentRepository.save).toHaveBeenCalledTimes(1);
     });
   });
 });

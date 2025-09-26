@@ -22,20 +22,27 @@ export class PrismaPaymentRepository implements PaymentRepository {
       providerRef: payment.providerRef || null,
     };
 
-    const saved = await this.prisma.payment.create({
-      data,
+    // Usar transação explícita para garantir persistência
+    const result = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.payment.create({
+        data,
+      });
+
+      await tx.$executeRaw`SELECT 1`;
+
+      return saved;
     });
 
     return Payment.restore({
-      id: saved.id,
-      cpf: saved.cpf,
-      description: saved.description,
-      amount: Number(saved.amount),
-      paymentMethod: saved.paymentMethod as PaymentMethod,
-      status: saved.status as PaymentStatus,
-      providerRef: saved.providerRef ?? undefined,
-      createdAt: saved.createdAt,
-      updatedAt: saved.updatedAt,
+      id: result.id,
+      cpf: result.cpf,
+      description: result.description,
+      amount: Number(result.amount),
+      paymentMethod: result.paymentMethod as PaymentMethod,
+      status: result.status as PaymentStatus,
+      providerRef: result.providerRef ?? undefined,
+      createdAt: result.createdAt,
+      updatedAt: result.updatedAt,
     });
   }
 

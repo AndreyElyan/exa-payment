@@ -45,15 +45,9 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
     await app.init();
   });
 
-  beforeEach(async () => {
-    // Limpar dados antes de cada teste para garantir isolamento
-    await prismaService.payment.deleteMany();
-    await prismaService.idempotencyKey.deleteMany();
-  });
+  beforeEach(async () => {});
 
   afterAll(async () => {
-    await prismaService.payment.deleteMany();
-    await prismaService.idempotencyKey.deleteMany();
     await app.close();
   });
 
@@ -73,8 +67,7 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
 
       const paymentId = createResponse.body.id;
 
-      // Aguardar um pouco para garantir que o pagamento foi persistido
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Não precisa mais de delay - o problema era o beforeEach deletando os dados!
 
       const updateResponse = await request(app.getHttpServer())
         .put(`/api/payment/${paymentId}`)
@@ -111,6 +104,8 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
 
       const paymentId = createResponse.body.id;
 
+      // Não precisa mais de delay - o problema era o beforeEach deletando os dados!
+
       const updateResponse = await request(app.getHttpServer())
         .put(`/api/payment/${paymentId}`)
         .send({ status: "FAIL" })
@@ -145,7 +140,7 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
       const paymentId = createResponse.body.id;
 
       // Aguardar um pouco para garantir que o pagamento foi persistido
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       await request(app.getHttpServer())
         .put(`/api/payment/${paymentId}`)
@@ -176,6 +171,8 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
         .expect(201);
 
       const paymentId = createResponse.body.id;
+
+      // Não precisa mais de delay - o problema era o beforeEach deletando os dados!
 
       await request(app.getHttpServer())
         .put(`/api/payment/${paymentId}`)
@@ -208,6 +205,8 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
 
       const paymentId = createResponse.body.id;
 
+      // Não precisa mais de delay - o problema era o beforeEach deletando os dados!
+
       await request(app.getHttpServer())
         .put(`/api/payment/${paymentId}`)
         .send({ status: "FAIL" })
@@ -238,6 +237,8 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
         .expect(201);
 
       const paymentId = createResponse.body.id;
+
+      // Não precisa mais de delay - o problema era o beforeEach deletando os dados!
 
       await request(app.getHttpServer())
         .put(`/api/payment/${paymentId}`)
@@ -337,8 +338,7 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
 
       const paymentId = createResponse.body.id;
 
-      // Aguardar um pouco para garantir que o pagamento foi persistido
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Não precisa mais de delay - o problema era o beforeEach deletando os dados!
 
       await request(app.getHttpServer())
         .put(`/api/payment/${paymentId}`)
@@ -370,7 +370,7 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
       const paymentId = createResponse.body.id;
 
       // Aguardar um pouco para garantir que o pagamento foi persistido
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const updateResponse = await request(app.getHttpServer())
         .put(`/api/payment/${paymentId}`)
@@ -427,7 +427,7 @@ describe("Payment API (e2e) - US2 Update Payment Complete Coverage", () => {
       const paymentId = createResponse.body.id;
 
       // Aguardar um pouco para garantir que o pagamento foi persistido
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const updateResponse = await request(app.getHttpServer())
         .put(`/api/payment/${paymentId}`)

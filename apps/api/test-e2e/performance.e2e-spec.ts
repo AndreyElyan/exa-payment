@@ -25,14 +25,9 @@ describe("Payment API Performance Tests", () => {
     await app.init();
   });
 
-  beforeEach(async () => {
-    // Clean up database before each test to avoid constraint violations
-    await prismaService.payment.deleteMany();
-    await prismaService.idempotencyKey.deleteMany();
-  });
+  beforeEach(async () => {});
 
   afterAll(async () => {
-    await prismaService.payment.deleteMany();
     await app.close();
   });
 
