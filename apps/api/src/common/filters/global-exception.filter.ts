@@ -50,7 +50,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
-    // Log do erro
     console.error(`[${traceId}] Error:`, {
       url: request.url,
       method: request.method,
@@ -62,7 +61,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   }
 
   private mapStringResponse(message: string, traceId: string): ErrorResponse {
-    // Mapear mensagens conhecidas para códigos específicos
     if (message.includes("CPF inválido")) {
       return {
         code: "VALIDATION_ERROR",
@@ -92,6 +90,22 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
+    if (message.includes("Payment not found")) {
+      return {
+        code: "NOT_FOUND",
+        message,
+        traceId,
+      };
+    }
+
+    if (message.includes("Invalid state transition")) {
+      return {
+        code: "INVALID_STATE_TRANSITION",
+        message,
+        traceId,
+      };
+    }
+
     return {
       code: "VALIDATION_ERROR",
       message,
@@ -100,15 +114,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   }
 
   private mapObjectResponse(response: any, traceId: string): ErrorResponse {
-    // Se já tem a estrutura esperada
     if (response.code && response.message) {
       return {
         ...response,
         traceId,
       };
     }
-
-    // Mapear validações do class-validator
     if (response.message && Array.isArray(response.message)) {
       const firstError = response.message[0];
       return {

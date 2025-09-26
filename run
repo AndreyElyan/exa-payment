@@ -29,6 +29,7 @@ show_commands () {
     echo "sh run prisma:generate   - Gera cliente Prisma"
     echo "sh run prisma:migrate    - Executa migrações do banco"
     echo "sh run prisma:seed       - Executa seed do banco"
+    echo "sh run prisma:studio     - Abre Prisma Studio"
     echo
 }
 
@@ -52,7 +53,6 @@ start_app () {
 
     devops_start
     execute_npm_install
-    prisma_generate
 
     echo "$ICON Iniciando API em modo desenvolvimento..."
     npx nest start api --watch
@@ -68,7 +68,6 @@ debug () {
 
     devops_start
     execute_npm_install
-    prisma_generate
 
     echo "$ICON Iniciando API em modo debug..."
     npx nest start api --debug
@@ -139,6 +138,11 @@ prisma_seed () {
     npx prisma db seed --schema=apps/api/prisma/schema.prisma
 }
 
+prisma_studio () {
+    echo "$ICON Abrindo Prisma Studio..."
+    npx prisma studio --schema=apps/api/prisma/schema.prisma
+}
+
 if [ $# -gt 0 ]; then
     case "$1" in
       "start-app") start_app "$@" ;;
@@ -156,6 +160,7 @@ if [ $# -gt 0 ]; then
       "prisma:generate") prisma_generate "$@" ;;
       "prisma:migrate") prisma_migrate "$@" ;;
       "prisma:seed") prisma_seed "$@" ;;
+      "prisma:studio") prisma_studio "$@" ;;
     *) show_commands ;;
     esac
 else

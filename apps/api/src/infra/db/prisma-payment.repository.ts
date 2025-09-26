@@ -13,13 +13,13 @@ export class PrismaPaymentRepository implements PaymentRepository {
 
   async save(payment: Payment): Promise<Payment> {
     const data = {
-      id: payment.id || undefined,
+      id: payment.id,
       cpf: payment.cpf,
       description: payment.description,
       amount: payment.amount,
       paymentMethod: payment.paymentMethod,
       status: payment.status,
-      providerRef: payment.providerRef ?? undefined,
+      providerRef: payment.providerRef || null,
     };
 
     const saved = await this.prisma.payment.create({
@@ -68,7 +68,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
       amount: payment.amount,
       paymentMethod: payment.paymentMethod,
       status: payment.status,
-      providerRef: payment.providerRef ?? undefined,
+      providerRef: payment.providerRef || null,
     };
 
     const updated = await this.prisma.payment.update({

@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Payment {
-  id            String   @id @default(cuid())
+  id            String   @id
   cpf           String   @db.VarChar(11)
   description   String   @db.VarChar(255)
   amount        Decimal  @db.Decimal(12, 2)

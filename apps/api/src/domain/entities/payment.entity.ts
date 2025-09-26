@@ -1,12 +1,15 @@
+import { PaymentStatusChangedEvent } from "../events/payment-status-changed.event";
+import { v4 as uuidv4 } from "uuid";
+
 export enum PaymentMethod {
-  PIX = 'PIX',
-  CREDIT_CARD = 'CREDIT_CARD',
+  PIX = "PIX",
+  CREDIT_CARD = "CREDIT_CARD",
 }
 
 export enum PaymentStatus {
-  PENDING = 'PENDING',
-  PAID = 'PAID',
-  FAIL = 'FAIL',
+  PENDING = "PENDING",
+  PAID = "PAID",
+  FAIL = "FAIL",
 }
 
 export interface PaymentProps {
@@ -22,12 +25,16 @@ export interface PaymentProps {
 }
 
 export class Payment {
+  private domainEvents: PaymentStatusChangedEvent[] = [];
+
   private constructor(private props: PaymentProps) {}
 
-  static create(props: Omit<PaymentProps, 'id' | 'status' | 'createdAt' | 'updatedAt'>): Payment {
+  static create(
+    props: Omit<PaymentProps, "id" | "status" | "createdAt" | "updatedAt">,
+  ): Payment {
     return new Payment({
       ...props,
-      id: '',
+      id: uuidv4(),
       status: PaymentStatus.PENDING,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -79,12 +86,64 @@ export class Payment {
     this.props.updatedAt = new Date();
   }
 
+  transitionTo(newStatus: PaymentStatus): void {
+    const currentStatus = this.props.status;
+
+    if (currentStatus === newStatus) {
+      return;
+    }
+
+    const validTransitions = this.getValidTransitions();
+
+    if (!validTransitions.includes(newStatus)) {
+      throw new Error(
+        `Invalid state transition from ${currentStatus} to ${newStatus}`,
+      );
+    }
+
+    this.props.status = newStatus;
+    this.props.updatedAt = new Date();
+
+    this.addDomainEvent(
+      new PaymentStatusChangedEvent({
+        paymentId: this.props.id,
+        oldStatus: currentStatus,
+        newStatus: newStatus,
+        changedAt: this.props.updatedAt,
+      }),
+    );
+  }
+
+  private getValidTransitions(): PaymentStatus[] {
+    switch (this.props.status) {
+      case PaymentStatus.PENDING:
+        return [PaymentStatus.PAID, PaymentStatus.FAIL];
+      case PaymentStatus.PAID:
+      case PaymentStatus.FAIL:
+        return [];
+      default:
+        return [];
+    }
+  }
+
   isCreditCard(): boolean {
     return this.props.paymentMethod === PaymentMethod.CREDIT_CARD;
   }
 
   isPix(): boolean {
     return this.props.paymentMethod === PaymentMethod.PIX;
+  }
+
+  addDomainEvent(event: PaymentStatusChangedEvent): void {
+    this.domainEvents.push(event);
+  }
+
+  getDomainEvents(): PaymentStatusChangedEvent[] {
+    return [...this.domainEvents];
+  }
+
+  clearDomainEvents(): void {
+    this.domainEvents = [];
   }
 
   toJSON(): PaymentProps {

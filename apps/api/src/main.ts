@@ -9,10 +9,7 @@ async function bootstrap() {
 
     const app = await NestFactory.create(AppModule);
 
-    // Global exception filter
     app.useGlobalFilters(new GlobalExceptionFilter());
-
-    // Global validation pipe
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -34,6 +31,7 @@ async function bootstrap() {
     console.log(`✅ Payment API is running on port ${port}`);
     console.log("📡 Available endpoints:");
     console.log("  POST /api/payment - Create payment");
+    console.log("  PUT  /api/payment/:id - Update payment");
     console.log("  GET  /api/payment/:id - Get payment by ID");
     console.log("  GET  /api/payment - List payments");
     console.log("🚀 Ready to process payments!");
