@@ -16,7 +16,7 @@ async function bootstrap() {
       }),
     );
 
-    const port = process.env.PORT || 3000;
+    const port = process.env.PORT || 5050;
     await app.listen(port);
 
     console.log(`✅ Payment API is running on port ${port}`);

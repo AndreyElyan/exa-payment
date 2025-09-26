@@ -14,18 +14,21 @@ show_commands () {
     echo
     echo "$ICON Comandos disponíveis:"
     echo
-    echo "sh dev start-app api     - Inicia a API em modo Dev"
-    echo "sh dev debug api         - Inicia a API em modo debug"
-    echo "sh dev build             - Builda a aplicação"
-    echo "sh dev test              - Executa todos os testes"
-    echo "sh dev test:unit         - Executa testes unitários"
-    echo "sh dev test:e2e          - Executa testes e2e"
-    echo "sh dev test:cov          - Executa testes com cobertura"
-    echo "sh dev test:watch        - Executa testes em modo watch"
-    echo "sh dev lint              - Executa lint"
-    echo "sh dev format            - Formata código"
-    echo "sh dev docker:up         - Sobe infraestrutura Docker"
-    echo "sh dev docker:down       - Para infraestrutura Docker"
+    echo "sh run start-app api     - Inicia a API em modo Dev"
+    echo "sh run debug api         - Inicia a API em modo debug"
+    echo "sh run build             - Builda a aplicação"
+    echo "sh run test              - Executa todos os testes"
+    echo "sh run test:unit         - Executa testes unitários"
+    echo "sh run test:e2e          - Executa testes e2e"
+    echo "sh run test:cov          - Executa testes com cobertura"
+    echo "sh run test:watch        - Executa testes em modo watch"
+    echo "sh run lint              - Executa lint"
+    echo "sh run format            - Formata código"
+    echo "sh run docker:up         - Sobe infraestrutura Docker"
+    echo "sh run docker:down       - Para infraestrutura Docker"
+    echo "sh run prisma:generate   - Gera cliente Prisma"
+    echo "sh run prisma:migrate    - Executa migrações do banco"
+    echo "sh run prisma:seed       - Executa seed do banco"
     echo
 }
 
@@ -43,12 +46,13 @@ start_app () {
     APP=$2
 
     if [ -z "$APP" ] || [ "$APP" != "api" ]; then
-        echo "$ICON Use: sh dev start-app api"
+        echo "$ICON Use: sh run start-app api"
         exit 1
     fi
 
     devops_start
     execute_npm_install
+    prisma_generate
 
     echo "$ICON Iniciando API em modo desenvolvimento..."
     npx nest start api --watch
@@ -58,12 +62,13 @@ debug () {
     APP=$2
 
     if [ -z "$APP" ] || [ "$APP" != "api" ]; then
-        echo "$ICON Use: sh dev debug api"
+        echo "$ICON Use: sh run debug api"
         exit 1
     fi
 
     devops_start
     execute_npm_install
+    prisma_generate
 
     echo "$ICON Iniciando API em modo debug..."
     npx nest start api --debug
@@ -119,6 +124,21 @@ docker_down () {
     npm run docker:down
 }
 
+prisma_generate () {
+    echo "$ICON Gerando cliente Prisma..."
+    npx prisma generate --schema=apps/api/prisma/schema.prisma
+}
+
+prisma_migrate () {
+    echo "$ICON Executando migrações do banco..."
+    npx prisma migrate dev --schema=apps/api/prisma/schema.prisma
+}
+
+prisma_seed () {
+    echo "$ICON Executando seed do banco..."
+    npx prisma db seed --schema=apps/api/prisma/schema.prisma
+}
+
 if [ $# -gt 0 ]; then
     case "$1" in
       "start-app") start_app "$@" ;;
@@ -133,6 +153,9 @@ if [ $# -gt 0 ]; then
       "format") format_app "$@" ;;
       "docker:up") docker_up "$@" ;;
       "docker:down") docker_down "$@" ;;
+      "prisma:generate") prisma_generate "$@" ;;
+      "prisma:migrate") prisma_migrate "$@" ;;
+      "prisma:seed") prisma_seed "$@" ;;
     *) show_commands ;;
     esac
 else

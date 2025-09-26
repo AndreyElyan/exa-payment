@@ -15,7 +15,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
       amount: payment.amount,
       paymentMethod: payment.paymentMethod,
       status: payment.status,
-      providerRef: payment.providerRef,
+      providerRef: payment.providerRef ?? undefined,
     };
 
     const saved = await this.prisma.payment.create({
@@ -29,7 +29,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
       amount: Number(saved.amount),
       paymentMethod: saved.paymentMethod as PaymentMethod,
       status: saved.status as PaymentStatus,
-      providerRef: saved.providerRef,
+      providerRef: saved.providerRef ?? undefined,
       createdAt: saved.createdAt,
       updatedAt: saved.updatedAt,
     });
@@ -51,7 +51,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
       amount: Number(payment.amount),
       paymentMethod: payment.paymentMethod as PaymentMethod,
       status: payment.status as PaymentStatus,
-      providerRef: payment.providerRef,
+      providerRef: payment.providerRef ?? undefined,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
     });
@@ -64,7 +64,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
       amount: payment.amount,
       paymentMethod: payment.paymentMethod,
       status: payment.status,
-      providerRef: payment.providerRef,
+      providerRef: payment.providerRef ?? undefined,
     };
 
     const updated = await this.prisma.payment.update({
@@ -79,7 +79,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
       amount: Number(updated.amount),
       paymentMethod: updated.paymentMethod as PaymentMethod,
       status: updated.status as PaymentStatus,
-      providerRef: updated.providerRef,
+      providerRef: updated.providerRef ?? undefined,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     });

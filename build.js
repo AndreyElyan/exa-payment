@@ -26,7 +26,7 @@ async function buildLibraries() {
   for (const lib of libs) {
     console.log(`${ICON} Buildando lib: ${lib}`);
     try {
-      execSync(`npx @nestjs/cli build ${lib}`, { stdio: 'inherit' });
+      execSync(`npx tsc -p libs/${lib}/tsconfig.lib.json`, { stdio: 'inherit' });
       console.log(`${ICON} ✅ Lib ${lib} buildada com sucesso`);
     } catch (error) {
       console.error(`${ICON} ❌ Erro ao buildar lib ${lib}:`, error.message);
@@ -44,7 +44,7 @@ async function buildApplications() {
     .map((app) => {
       return new Promise((resolve, reject) => {
         console.log(`${ICON} Buildando app: ${app}`);
-        exec(`npx @nestjs/cli build ${app}`, (error, stdout, stderr) => {
+        exec(`npx tsc -p apps/${app}/tsconfig.app.json`, (error, stdout, stderr) => {
           if (error) {
             console.error(`${ICON} ❌ Erro ao buildar app ${app}:`, error.message);
             reject(error);

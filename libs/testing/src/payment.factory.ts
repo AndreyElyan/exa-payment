@@ -1,4 +1,4 @@
-import { CreatePaymentDto } from '@contracts/schemas';
+import { CreatePaymentDto } from '@app/contracts';
 
 export class PaymentTestFactory {
   static createValidPaymentDto(): CreatePaymentDto {
