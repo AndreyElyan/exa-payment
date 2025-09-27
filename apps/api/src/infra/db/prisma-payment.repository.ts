@@ -1,6 +1,10 @@
 import { Injectable, Inject } from "@nestjs/common";
 import { PrismaService } from "./prisma.service";
-import { PaymentRepository } from "../../application/ports/payment.repository.port";
+import {
+  PaymentRepository,
+  FindManyFilters,
+  FindManyResult,
+} from "../../application/ports/payment.repository.port";
 import {
   Payment,
   PaymentMethod,
@@ -94,5 +98,56 @@ export class PrismaPaymentRepository implements PaymentRepository {
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     });
+  }
+
+  async findMany(
+    filters: FindManyFilters,
+    page: number,
+    limit: number,
+  ): Promise<FindManyResult> {
+    const where: any = {};
+
+    if (filters.cpf) {
+      where.cpf = filters.cpf;
+    }
+
+    if (filters.paymentMethod) {
+      where.paymentMethod = filters.paymentMethod;
+    }
+
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+
+    const paymentItems = items.map((item) =>
+      Payment.restore({
+        id: item.id,
+        cpf: item.cpf,
+        description: item.description,
+        amount: Number(item.amount),
+        paymentMethod: item.paymentMethod as PaymentMethod,
+        status: item.status as PaymentStatus,
+        providerRef: item.providerRef ?? undefined,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }),
+    );
+
+    return {
+      items: paymentItems,
+      total,
+    };
   }
 }

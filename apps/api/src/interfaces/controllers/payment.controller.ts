@@ -11,13 +11,17 @@ import {
   Res,
   Param,
   NotFoundException,
+  Query,
 } from "@nestjs/common";
 import { CreatePaymentUseCase } from "../../application/use-cases/create-payment.use-case";
 import { UpdatePaymentUseCase } from "../../application/use-cases/update-payment.use-case";
 import { CreatePaymentDto } from "../dto/create-payment.dto";
 import { UpdatePaymentDto } from "../dto/update-payment.dto";
 import { PaymentResponseDto } from "../dto/payment-response.dto";
+import { ListPaymentsQueryDto } from "../dto/list-payments-query.dto";
+import { ListPaymentsResponseDto } from "../dto/list-payments-response.dto";
 import { PaymentRepository } from "../../application/ports/payment.repository.port";
+import { QueryValidationPipe } from "../../common/pipes/query-validation.pipe";
 import { Response } from "express";
 
 @Controller("api/payment")
@@ -76,5 +80,27 @@ export class PaymentController {
     });
 
     return new PaymentResponseDto(result.payment.toJSON());
+  }
+
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  async listPayments(
+    @Query(new QueryValidationPipe()) query: ListPaymentsQueryDto,
+  ): Promise<ListPaymentsResponseDto> {
+    const { cpf, paymentMethod, status, page = 1, limit = 20 } = query;
+
+    const filters = {
+      cpf,
+      paymentMethod,
+      status,
+    };
+
+    const result = await this.paymentRepository.findMany(filters, page, limit);
+
+    const paymentDtos = result.items.map(
+      (payment) => new PaymentResponseDto(payment.toJSON()),
+    );
+
+    return new ListPaymentsResponseDto(paymentDtos, page, limit, result.total);
   }
 }
