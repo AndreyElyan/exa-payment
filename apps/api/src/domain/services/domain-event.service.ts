@@ -23,4 +23,9 @@ export class DomainEventService {
   hasEvents(): boolean {
     return this.events.length > 0;
   }
+
+  async publishPaymentStatusChanged(event: any): Promise<void> {
+    // Implementation for publishing payment status changed events
+    console.log("Publishing payment status changed event:", event);
+  }
 }

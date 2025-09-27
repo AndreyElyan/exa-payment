@@ -7,6 +7,7 @@ export interface CreateCreditCardChargeInput {
 
 export interface CreateCreditCardChargeOutput {
   providerRef: string;
+  initPoint?: string;
 }
 
 export interface PaymentProvider {

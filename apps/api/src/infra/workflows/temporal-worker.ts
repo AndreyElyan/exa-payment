@@ -28,7 +28,11 @@ export class TemporalWorkerService implements OnModuleInit, OnModuleDestroy {
         connection: this.connection,
         namespace: process.env.TEMPORAL_NAMESPACE || "default",
         taskQueue: "payment-workflow",
-        workflowsPath: path.join(__dirname, "payment"),
+        workflowsPath: path.join(
+          __dirname,
+          "payment",
+          "credit-card-payment.workflow.js",
+        ),
         activities: {
           createPaymentRecord: this.paymentActivities.createPaymentRecord.bind(
             this.paymentActivities,

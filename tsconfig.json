@@ -4,6 +4,6 @@
     "outDir": "./dist",
     "noEmit": true
   },
-  "include": [],
+  "include": ["apps/**/*", "packages/**/*"],
   "exclude": ["node_modules", "dist"]
 }

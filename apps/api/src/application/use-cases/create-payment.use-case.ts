@@ -12,7 +12,7 @@ import { IdempotencyService } from "../../domain/services/idempotency.service";
 import { PaymentRepository } from "../ports/payment.repository.port";
 import { PaymentProvider } from "../ports/payment-provider.port";
 import { CreatePaymentDto } from "../../interfaces/dto/create-payment.dto";
-import { TemporalClientService } from "../../infra/workflows/temporal-client";
+// import { TemporalClientService } from "../../infra/workflows/temporal-client";
 
 export interface CreatePaymentInput {
   dto: CreatePaymentDto;
@@ -35,7 +35,7 @@ export class CreatePaymentUseCase {
     private readonly paymentProvider: PaymentProvider,
     @Inject(IdempotencyService)
     private readonly idempotencyService: IdempotencyService,
-    private readonly temporalClient: TemporalClientService,
+    // private readonly temporalClient: TemporalClientService,
   ) {}
 
   async execute(input: CreatePaymentInput): Promise<CreatePaymentOutput> {
@@ -108,53 +108,29 @@ export class CreatePaymentUseCase {
     if (payment.isCreditCard()) {
       try {
         this.logger.log(
-          `Starting Temporal workflow for credit card payment ${payment.id}`,
+          `Processing credit card payment ${payment.id} directly with provider`,
         );
 
-        const workflowResult =
-          await this.temporalClient.startCreditCardPaymentWorkflow({
-            paymentId: payment.id,
-            cpf: payment.cpf,
-            description: payment.description,
+        const providerResult =
+          await this.paymentProvider.createCreditCardCharge({
             amount: payment.amount,
+            description: payment.description,
             idempotencyKey: idempotencyKey || payment.id,
+            cpf: payment.cpf,
           });
 
+        payment.setProviderRef(providerResult.providerRef);
         this.logger.log(
-          `Temporal workflow started successfully: ${workflowResult.workflowId}`,
+          `Credit card payment processed successfully with providerRef: ${providerResult.providerRef}`,
         );
       } catch (error) {
         this.logger.error(
-          `Error starting Temporal workflow for payment ${payment.id}:`,
+          `Error processing credit card payment ${payment.id}:`,
           error,
         );
-
-        this.logger.warn(
-          `Falling back to direct provider call for payment ${payment.id}`,
+        throw new ServiceUnavailableException(
+          "Payment processing service unavailable",
         );
-
-        try {
-          const providerResult =
-            await this.paymentProvider.createCreditCardCharge({
-              amount: payment.amount,
-              description: payment.description,
-              idempotencyKey: idempotencyKey || payment.id,
-              cpf: payment.cpf,
-            });
-
-          payment.setProviderRef(providerResult.providerRef);
-          this.logger.log(
-            `Fallback charge created successfully with providerRef: ${providerResult.providerRef}`,
-          );
-        } catch (fallbackError) {
-          this.logger.error(
-            `Fallback also failed for payment ${payment.id}:`,
-            fallbackError,
-          );
-          throw new ServiceUnavailableException(
-            "Payment processing service unavailable",
-          );
-        }
       }
     }
 

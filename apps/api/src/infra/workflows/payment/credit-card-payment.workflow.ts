@@ -7,6 +7,7 @@ import {
   setHandler,
   ApplicationFailure,
 } from "@temporalio/workflow";
+import { PaymentStatus } from "../../../domain/entities/payment.entity";
 import type { PaymentActivities } from "./payment.activities";
 
 const {
@@ -34,7 +35,7 @@ export interface CreditCardPaymentInput {
 }
 
 export interface PaymentStatusSignal {
-  status: "PAID" | "FAIL";
+  status: PaymentStatus.PAID | PaymentStatus.FAIL;
   providerData?: any;
 }
 
@@ -45,7 +46,7 @@ export const getPaymentStatusQuery = defineQuery<string>("getPaymentStatus");
 export async function creditCardPaymentWorkflow(
   input: CreditCardPaymentInput,
 ): Promise<{ status: string; initPoint?: string }> {
-  let currentStatus = "PENDING";
+  let currentStatus = PaymentStatus.PENDING;
   let initPoint: string | undefined;
   let signalReceived = false;
 
@@ -62,7 +63,7 @@ export async function creditCardPaymentWorkflow(
       cpf: input.cpf,
       description: input.description,
       amount: input.amount,
-      status: "PENDING",
+      status: PaymentStatus.PENDING,
     });
 
     const preferenceResult = await createMercadoPagoPreference({
@@ -76,7 +77,7 @@ export async function creditCardPaymentWorkflow(
 
     await updatePaymentStatus({
       paymentId: input.paymentId,
-      status: "PENDING",
+      status: PaymentStatus.PENDING,
       providerRef: preferenceResult.providerRef,
     });
 
@@ -97,8 +98,11 @@ export async function creditCardPaymentWorkflow(
             providerRef: preferenceResult.providerRef,
           });
 
-          if (statusFromProvider && statusFromProvider !== "PENDING") {
-            currentStatus = statusFromProvider;
+          if (
+            statusFromProvider &&
+            statusFromProvider !== PaymentStatus.PENDING
+          ) {
+            currentStatus = statusFromProvider as PaymentStatus;
             break;
           }
         } catch (error) {
@@ -110,18 +114,18 @@ export async function creditCardPaymentWorkflow(
     }
 
     if (!signalReceived && attempts >= maxAttempts) {
-      currentStatus = "FAIL";
+      currentStatus = PaymentStatus.FAIL;
     }
 
     await updatePaymentStatus({
       paymentId: input.paymentId,
-      status: currentStatus as "PENDING" | "PAID" | "FAIL",
+      status: currentStatus as PaymentStatus,
     });
 
     await publishStatusChangeEvent({
       paymentId: input.paymentId,
-      oldStatus: "PENDING",
-      newStatus: currentStatus as "PENDING" | "PAID" | "FAIL",
+      oldStatus: PaymentStatus.PENDING,
+      newStatus: currentStatus as PaymentStatus,
     });
 
     return {
@@ -131,13 +135,13 @@ export async function creditCardPaymentWorkflow(
   } catch (error) {
     await updatePaymentStatus({
       paymentId: input.paymentId,
-      status: "FAIL",
+      status: PaymentStatus.FAIL,
     });
 
     await publishStatusChangeEvent({
       paymentId: input.paymentId,
-      oldStatus: "PENDING",
-      newStatus: "FAIL",
+      oldStatus: PaymentStatus.PENDING,
+      newStatus: PaymentStatus.FAIL,
     });
 
     throw ApplicationFailure.create({

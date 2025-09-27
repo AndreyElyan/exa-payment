@@ -1,15 +1,19 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Inject } from "@nestjs/common";
 import { PaymentRepository } from "../../../application/ports/payment.repository.port";
 import { PaymentProvider } from "../../../application/ports/payment-provider.port";
 import { DomainEventService } from "../../../domain/services/domain-event.service";
-import { Payment } from "../../../domain/entities/payment.entity";
+import {
+  Payment,
+  PaymentMethod,
+  PaymentStatus,
+} from "../../../domain/entities/payment.entity";
 
 export interface CreatePaymentRecordInput {
   paymentId: string;
   cpf: string;
   description: string;
   amount: number;
-  status: "PENDING" | "PAID" | "FAIL";
+  status: PaymentStatus;
 }
 
 export interface CreateMercadoPagoPreferenceInput {
@@ -26,7 +30,7 @@ export interface CreateMercadoPagoPreferenceOutput {
 
 export interface UpdatePaymentStatusInput {
   paymentId: string;
-  status: "PENDING" | "PAID" | "FAIL";
+  status: PaymentStatus;
   providerRef?: string;
 }
 
@@ -55,7 +59,9 @@ export class PaymentActivitiesImpl implements PaymentActivities {
   private readonly logger = new Logger(PaymentActivitiesImpl.name);
 
   constructor(
+    @Inject("PaymentRepository")
     private readonly paymentRepository: PaymentRepository,
+    @Inject("PaymentProvider")
     private readonly paymentProvider: PaymentProvider,
     private readonly domainEventService: DomainEventService,
   ) {}
@@ -64,12 +70,10 @@ export class PaymentActivitiesImpl implements PaymentActivities {
     this.logger.log(`Creating payment record: ${input.paymentId}`);
 
     const payment = Payment.create({
-      id: input.paymentId,
       cpf: input.cpf,
       description: input.description,
       amount: input.amount,
-      paymentMethod: "CREDIT_CARD",
-      status: input.status,
+      paymentMethod: PaymentMethod.CREDIT_CARD,
     });
 
     await this.paymentRepository.save(payment);

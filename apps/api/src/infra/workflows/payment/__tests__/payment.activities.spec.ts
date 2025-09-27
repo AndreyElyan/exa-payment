@@ -4,7 +4,10 @@ import { PaymentActivitiesImpl } from "../payment.activities";
 import { PaymentRepository } from "../../../../application/ports/payment.repository.port";
 import { PaymentProvider } from "../../../../application/ports/payment-provider.port";
 import { DomainEventService } from "../../../../domain/services/domain-event.service";
-import { Payment } from "../../../../domain/entities/payment.entity";
+import {
+  Payment,
+  PaymentStatus,
+} from "../../../../domain/entities/payment.entity";
 import { vi } from "vitest";
 
 describe("PaymentActivitiesImpl", () => {
@@ -62,7 +65,7 @@ describe("PaymentActivitiesImpl", () => {
         description: "Test payment",
         amount: 100.5,
         paymentMethod: "CREDIT_CARD",
-        status: "PENDING",
+        status: PaymentStatus.PENDING,
       };
 
       mockPaymentRepository.save.mockResolvedValue(mockPayment as any);
@@ -75,7 +78,7 @@ describe("PaymentActivitiesImpl", () => {
           description: "Test payment",
           amount: 100.5,
           paymentMethod: "CREDIT_CARD",
-          status: "PENDING",
+          status: PaymentStatus.PENDING,
         }),
       );
     });
@@ -151,13 +154,13 @@ describe("PaymentActivitiesImpl", () => {
     it("should update payment status successfully", async () => {
       const input = {
         paymentId: "pay_123",
-        status: "PAID" as const,
+        status: PaymentStatus.PAID,
         providerRef: "mp_123456789",
       };
 
       const mockPayment = {
         id: "pay_123",
-        status: "PENDING",
+        status: PaymentStatus.PENDING,
         setProviderRef: vi.fn(),
         transitionTo: vi.fn(),
       };
@@ -169,14 +172,14 @@ describe("PaymentActivitiesImpl", () => {
 
       expect(mockPaymentRepository.findById).toHaveBeenCalledWith("pay_123");
       expect(mockPayment.setProviderRef).toHaveBeenCalledWith("mp_123456789");
-      expect(mockPayment.transitionTo).toHaveBeenCalledWith("PAID");
+      expect(mockPayment.transitionTo).toHaveBeenCalledWith(PaymentStatus.PAID);
       expect(mockPaymentRepository.update).toHaveBeenCalledWith(mockPayment);
     });
 
     it("should handle payment not found", async () => {
       const input = {
         paymentId: "pay_nonexistent",
-        status: "PAID" as const,
+        status: PaymentStatus.PAID,
       };
 
       mockPaymentRepository.findById.mockResolvedValue(null);
@@ -189,12 +192,12 @@ describe("PaymentActivitiesImpl", () => {
     it("should update without providerRef if not provided", async () => {
       const input = {
         paymentId: "pay_123",
-        status: "FAIL" as const,
+        status: PaymentStatus.FAIL,
       };
 
       const mockPayment = {
         id: "pay_123",
-        status: "PENDING",
+        status: PaymentStatus.PENDING,
         setProviderRef: vi.fn(),
         transitionTo: vi.fn(),
       };
@@ -205,7 +208,7 @@ describe("PaymentActivitiesImpl", () => {
       await activities.updatePaymentStatus(input);
 
       expect(mockPayment.setProviderRef).not.toHaveBeenCalled();
-      expect(mockPayment.transitionTo).toHaveBeenCalledWith("FAIL");
+      expect(mockPayment.transitionTo).toHaveBeenCalledWith(PaymentStatus.FAIL);
     });
   });
 
@@ -216,7 +219,7 @@ describe("PaymentActivitiesImpl", () => {
       };
 
       const mockProviderWithStatus = {
-        getPaymentStatus: vi.fn().mockResolvedValue("PAID"),
+        getPaymentStatus: vi.fn().mockResolvedValue(PaymentStatus.PAID),
       };
 
       mockPaymentProvider.getPaymentStatus =
@@ -224,7 +227,7 @@ describe("PaymentActivitiesImpl", () => {
 
       const result = await activities.checkPaymentStatus(input);
 
-      expect(result).toBe("PAID");
+      expect(result).toBe(PaymentStatus.PAID);
       expect(mockProviderWithStatus.getPaymentStatus).toHaveBeenCalledWith(
         "mp_123456789",
       );
@@ -265,7 +268,7 @@ describe("PaymentActivitiesImpl", () => {
       const input = {
         paymentId: "pay_123",
         oldStatus: "PENDING" as const,
-        newStatus: "PAID" as const,
+        newStatus: PaymentStatus.PAID,
       };
 
       await activities.publishStatusChangeEvent(input);
@@ -275,7 +278,7 @@ describe("PaymentActivitiesImpl", () => {
       ).toHaveBeenCalledWith({
         paymentId: "pay_123",
         oldStatus: "PENDING",
-        newStatus: "PAID",
+        newStatus: PaymentStatus.PAID,
         occurredAt: expect.any(Date),
       });
     });
@@ -298,7 +301,7 @@ describe("PaymentActivitiesImpl", () => {
       const input = {
         paymentId: "pay_123",
         oldStatus: "PENDING" as const,
-        newStatus: "PAID" as const,
+        newStatus: PaymentStatus.PAID,
       };
 
       const error = new Error("Event publishing failed");
@@ -329,7 +332,7 @@ describe("PaymentActivitiesImpl", () => {
         description: "Test payment",
         amount: 100.5,
         paymentMethod: "CREDIT_CARD",
-        status: "PENDING",
+        status: PaymentStatus.PENDING,
       };
 
       mockPaymentRepository.save.mockResolvedValue(mockPayment as any);
@@ -358,13 +361,13 @@ describe("PaymentActivitiesImpl", () => {
       // Update payment status
       const updateInput = {
         paymentId: "pay_123",
-        status: "PAID" as const,
+        status: PaymentStatus.PAID,
         providerRef: "mp_123456789",
       };
 
       const mockPaymentForUpdate = {
         id: "pay_123",
-        status: "PENDING",
+        status: PaymentStatus.PENDING,
         setProviderRef: vi.fn(),
         transitionTo: vi.fn(),
       };
@@ -377,13 +380,15 @@ describe("PaymentActivitiesImpl", () => {
       );
 
       await activities.updatePaymentStatus(updateInput);
-      expect(mockPaymentForUpdate.transitionTo).toHaveBeenCalledWith("PAID");
+      expect(mockPaymentForUpdate.transitionTo).toHaveBeenCalledWith(
+        PaymentStatus.PAID,
+      );
 
       // Publish status change event
       const eventInput = {
         paymentId: "pay_123",
         oldStatus: "PENDING" as const,
-        newStatus: "PAID" as const,
+        newStatus: PaymentStatus.PAID,
       };
 
       await activities.publishStatusChangeEvent(eventInput);
