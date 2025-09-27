@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
@@ -40,6 +41,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       } else if (exception instanceof NotFoundException) {
         errorResponse = {
           code: "NOT_FOUND",
+          message: exception.message,
+          traceId,
+        };
+      } else if (exception instanceof ServiceUnavailableException) {
+        errorResponse = {
+          code: "SERVICE_UNAVAILABLE",
           message: exception.message,
           traceId,
         };
@@ -109,6 +116,33 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return {
         code: "INVALID_STATE_TRANSITION",
         message,
+        traceId,
+      };
+    }
+
+    if (message.includes("Payment provider timeout")) {
+      return {
+        code: "SERVICE_UNAVAILABLE",
+        message,
+        details: { field: "provider", reason: "timeout" },
+        traceId,
+      };
+    }
+
+    if (message.includes("Payment provider unavailable")) {
+      return {
+        code: "SERVICE_UNAVAILABLE",
+        message,
+        details: { field: "provider", reason: "unavailable" },
+        traceId,
+      };
+    }
+
+    if (message.includes("Invalid payment data provided to provider")) {
+      return {
+        code: "VALIDATION_ERROR",
+        message,
+        details: { field: "payment", reason: "invalid_provider_data" },
         traceId,
       };
     }

@@ -2,6 +2,7 @@ export interface CreateCreditCardChargeInput {
   amount: number;
   description: string;
   idempotencyKey: string;
+  cpf?: string;
 }
 
 export interface CreateCreditCardChargeOutput {
@@ -9,5 +10,7 @@ export interface CreateCreditCardChargeOutput {
 }
 
 export interface PaymentProvider {
-  createCreditCardCharge(input: CreateCreditCardChargeInput): Promise<CreateCreditCardChargeOutput>;
+  createCreditCardCharge(
+    input: CreateCreditCardChargeInput,
+  ): Promise<CreateCreditCardChargeOutput>;
 }

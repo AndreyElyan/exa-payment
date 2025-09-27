@@ -7,12 +7,14 @@ import {
 } from "../../../domain/entities/payment.entity";
 import { IdempotencyService } from "../../../domain/services/idempotency.service";
 import { CreatePaymentDto } from "../../../interfaces/dto/create-payment.dto";
+import { TemporalClientService } from "../../../infra/workflows/temporal-client";
 
 describe("CreatePaymentUseCase", () => {
   let useCase: CreatePaymentUseCase;
   let mockPaymentRepository: any;
   let mockPaymentProvider: any;
   let mockIdempotencyService: IdempotencyService;
+  let mockTemporalClient: any;
 
   beforeEach(() => {
     mockPaymentRepository = {
@@ -25,12 +27,20 @@ describe("CreatePaymentUseCase", () => {
       createCreditCardCharge: vi.fn(),
     };
 
+    mockTemporalClient = {
+      startCreditCardPaymentWorkflow: vi.fn(),
+      signalPaymentStatus: vi.fn(),
+      getPaymentStatus: vi.fn(),
+      getWorkflowResult: vi.fn(),
+    };
+
     mockIdempotencyService = new IdempotencyService();
 
     useCase = new CreatePaymentUseCase(
       mockPaymentRepository,
       mockPaymentProvider,
       mockIdempotencyService,
+      mockTemporalClient,
     );
   });
 
@@ -86,7 +96,48 @@ describe("CreatePaymentUseCase", () => {
   });
 
   describe("CREDIT_CARD payment scenarios", () => {
-    it("should create CREDIT_CARD payment successfully (Cenário 2)", async () => {
+    it("should create CREDIT_CARD payment successfully with Temporal (Cenário 2)", async () => {
+      const dto: CreatePaymentDto = {
+        cpf: "12345678909",
+        description: "Mensalidade",
+        amount: 199.9,
+        paymentMethod: PaymentMethod.CREDIT_CARD,
+      };
+
+      const idempotencyKey = "test-key-123";
+      const mockPayment = Payment.create({
+        cpf: dto.cpf,
+        description: dto.description,
+        amount: dto.amount,
+        paymentMethod: dto.paymentMethod,
+      });
+
+      mockTemporalClient.startCreditCardPaymentWorkflow.mockResolvedValue({
+        workflowId: "credit-card-payment-pay_123",
+        runId: "run_456",
+      });
+
+      mockPaymentRepository.save.mockResolvedValue(mockPayment);
+
+      const result = await useCase.execute({ dto, idempotencyKey });
+
+      expect(result.isNew).toBe(true);
+      expect(result.payment.paymentMethod).toBe(PaymentMethod.CREDIT_CARD);
+      expect(result.payment.status).toBe(PaymentStatus.PENDING);
+      expect(
+        mockTemporalClient.startCreditCardPaymentWorkflow,
+      ).toHaveBeenCalledWith({
+        paymentId: expect.any(String),
+        cpf: dto.cpf,
+        description: dto.description,
+        amount: dto.amount,
+        idempotencyKey,
+      });
+      expect(mockPaymentProvider.createCreditCardCharge).not.toHaveBeenCalled();
+      expect(mockPaymentRepository.save).toHaveBeenCalledTimes(1);
+    });
+
+    it("should fallback to provider when Temporal fails", async () => {
       const dto: CreatePaymentDto = {
         cpf: "12345678909",
         description: "Mensalidade",
@@ -104,26 +155,32 @@ describe("CreatePaymentUseCase", () => {
 
       const providerRef = "mp_123456789";
 
-      mockPaymentRepository.save.mockResolvedValue(mockPayment);
+      // Mock Temporal failure
+      mockTemporalClient.startCreditCardPaymentWorkflow.mockRejectedValue(
+        new Error("Temporal service unavailable"),
+      );
+
+      // Mock successful provider fallback
       mockPaymentProvider.createCreditCardCharge.mockResolvedValue({
         providerRef,
       });
-      mockPaymentRepository.update.mockResolvedValue({
-        ...mockPayment,
-        providerRef,
-      });
+
+      mockPaymentRepository.save.mockResolvedValue(mockPayment);
 
       const result = await useCase.execute({ dto, idempotencyKey });
 
       expect(result.isNew).toBe(true);
       expect(result.payment.paymentMethod).toBe(PaymentMethod.CREDIT_CARD);
       expect(result.payment.status).toBe(PaymentStatus.PENDING);
+      expect(
+        mockTemporalClient.startCreditCardPaymentWorkflow,
+      ).toHaveBeenCalled();
       expect(mockPaymentProvider.createCreditCardCharge).toHaveBeenCalledWith({
         amount: dto.amount,
         description: dto.description,
         idempotencyKey,
+        cpf: dto.cpf,
       });
-      // O providerRef agora é definido antes do save, não há mais update
       expect(mockPaymentRepository.save).toHaveBeenCalledTimes(1);
     });
 
@@ -261,19 +318,22 @@ describe("CreatePaymentUseCase", () => {
         paymentMethod: dto.paymentMethod,
       });
 
-      mockPaymentRepository.save.mockResolvedValue(mockPayment);
+      // Mock Temporal failure
+      mockTemporalClient.startCreditCardPaymentWorkflow.mockRejectedValue(
+        new Error("Temporal service unavailable"),
+      );
+
+      // Mock provider failure in fallback
       mockPaymentProvider.createCreditCardCharge.mockRejectedValue(
         new Error("Provider error"),
       );
 
-      // O CreatePaymentUseCase agora não propaga erros do provider - apenas loga e continua
-      const result = await useCase.execute({ dto, idempotencyKey });
+      mockPaymentRepository.save.mockResolvedValue(mockPayment);
 
-      expect(result.isNew).toBe(true);
-      expect(result.payment.paymentMethod).toBe(PaymentMethod.CREDIT_CARD);
-      expect(result.payment.status).toBe(PaymentStatus.PENDING);
-      // O pagamento é criado mesmo com erro do provider
-      expect(mockPaymentRepository.save).toHaveBeenCalledTimes(1);
+      // Should throw ServiceUnavailableException when both Temporal and provider fail
+      await expect(useCase.execute({ dto, idempotencyKey })).rejects.toThrow(
+        "Payment processing service unavailable",
+      );
     });
   });
 });

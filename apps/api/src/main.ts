@@ -34,7 +34,18 @@ async function bootstrap() {
     console.log("  PUT  /api/payment/:id - Update payment");
     console.log("  GET  /api/payment/:id - Get payment by ID");
     console.log("  GET  /api/payment - List payments");
-    console.log("🚀 Ready to process payments!");
+
+    console.log(`💳 Payment Provider: Mercado Pago`);
+    console.log("🔗 Mercado Pago integration enabled");
+    console.log(
+      "🌐 Using official Mercado Pago API: https://api.mercadopago.com/checkout/preferences",
+    );
+
+    console.log("⚡ Temporal Workflow enabled for CREDIT_CARD payments");
+    console.log("🔄 Robust payment processing with retries and durability");
+    console.log("🎛️ Temporal UI available at: http://localhost:8080");
+
+    console.log("🚀 Ready to process payments with Temporal Workflows!");
   } catch (error) {
     console.error("❌ Error starting application:", error);
     process.exit(1);

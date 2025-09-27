@@ -22,16 +22,9 @@ describe("Payment List (E2E)", () => {
     await app.init();
   });
 
-  beforeEach(async () => {
-    // CRÍTICO: NÃO limpar dados no beforeEach para evitar interferência
-    // O beforeEach estava DELETANDO os pagamentos criados!
-  });
+  beforeEach(async () => {});
 
   afterAll(async () => {
-    // CRÍTICO: NÃO limpar dados no afterAll para evitar interferência
-    // O afterAll estava DELETANDO os pagamentos criados!
-    // await prismaService.payment.deleteMany();
-    // await prismaService.idempotencyKey.deleteMany();
     await app.close();
   });
 
@@ -220,7 +213,7 @@ describe("Payment List (E2E)", () => {
 
     it("Scenario 6: Pagination", async () => {
       // 1. Create multiple payments for pagination test
-      const payments = [];
+      const payments: string[] = [];
       for (let i = 0; i < 5; i++) {
         const createResponse = await request(app.getHttpServer())
           .post("/api/payment")
