@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { PaymentController } from "./interfaces/controllers/payment.controller";
+import { WebhookController } from "./interfaces/controllers/webhook.controller";
 import { CreatePaymentUseCase } from "./application/use-cases/create-payment.use-case";
 import { UpdatePaymentUseCase } from "./application/use-cases/update-payment.use-case";
 import { PrismaService } from "./infra/db/prisma.service";
@@ -18,7 +19,7 @@ import { PaymentActivitiesImpl } from "./infra/workflows/payment/payment.activit
 
 @Module({
   imports: [],
-  controllers: [PaymentController],
+  controllers: [PaymentController, WebhookController],
   providers: [
     PrismaService,
     {

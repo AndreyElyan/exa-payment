@@ -1,6 +1,7 @@
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe, BadRequestException } from "@nestjs/common";
 import { AppModule } from "./app.module";
+import { TemporalWorkerService } from "./infra/workflows/temporal-worker";
 import { GlobalExceptionFilter } from "./common/filters/global-exception.filter";
 
 async function bootstrap() {
@@ -26,7 +27,14 @@ async function bootstrap() {
     );
 
     const port = process.env.PORT || 5050;
+    console.log(`🔧 Attempting to listen on port ${port}...`);
+
     await app.listen(port);
+
+    const worker = app.get(TemporalWorkerService);
+    await worker.start();
+
+    app.enableShutdownHooks();
 
     console.log(`✅ Payment API is running on port ${port}`);
     console.log("📡 Available endpoints:");
@@ -34,6 +42,8 @@ async function bootstrap() {
     console.log("  PUT  /api/payment/:id - Update payment");
     console.log("  GET  /api/payment/:id - Get payment by ID");
     console.log("  GET  /api/payment - List payments");
+    console.log("  POST /webhook/mercado-pago - Mercado Pago webhook");
+    console.log("  POST /webhook/mercado-pago/test - Test webhook");
 
     console.log(`💳 Payment Provider: Mercado Pago`);
     console.log("🔗 Mercado Pago integration enabled");

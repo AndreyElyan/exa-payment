@@ -1,22 +1,21 @@
 import { Worker, NativeConnection } from "@temporalio/worker";
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-  OnModuleDestroy,
-} from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import { PaymentActivitiesImpl } from "./payment/payment.activities";
 import * as path from "path";
 
 @Injectable()
-export class TemporalWorkerService implements OnModuleInit, OnModuleDestroy {
+export class TemporalWorkerService implements OnModuleDestroy {
   private readonly logger = new Logger(TemporalWorkerService.name);
   private worker?: Worker;
   private connection?: NativeConnection;
+  private isStarted = false;
 
   constructor(private readonly paymentActivities: PaymentActivitiesImpl) {}
 
-  async onModuleInit(): Promise<void> {
+  async start(): Promise<void> {
+    if (this.isStarted) {
+      return;
+    }
     try {
       this.logger.log("Starting Temporal Worker...");
 
@@ -54,7 +53,16 @@ export class TemporalWorkerService implements OnModuleInit, OnModuleDestroy {
         },
       });
 
-      await this.worker.run();
+      this.isStarted = true;
+      this.worker
+        .run()
+        .then(() => {
+          this.logger.log("Temporal Worker stopped");
+        })
+        .catch((error) => {
+          this.logger.error("Temporal Worker run failed", error);
+        });
+
       this.logger.log("Temporal Worker started successfully");
     } catch (error) {
       this.logger.error("Failed to start Temporal Worker", error);
@@ -66,7 +74,7 @@ export class TemporalWorkerService implements OnModuleInit, OnModuleDestroy {
     this.logger.log("Shutting down Temporal Worker...");
 
     if (this.worker) {
-      this.worker.shutdown();
+      await this.worker.shutdown();
     }
 
     if (this.connection) {
