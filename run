@@ -15,7 +15,11 @@ show_commands () {
     echo "$ICON Comandos disponíveis:"
     echo
     echo "sh run start-app api     - Inicia a API em modo Dev"
+    echo "sh run start-app consumer - Inicia o Consumer em modo Dev"
+    echo "sh run start-app all     - Inicia API + Consumer em modo Dev"
     echo "sh run debug api         - Inicia a API em modo debug"
+    echo "sh run debug consumer    - Inicia o Consumer em modo debug"
+    echo "sh run debug all         - Inicia API + Consumer em modo debug"
     echo "sh run build             - Builda a aplicação"
     echo "sh run test              - Executa todos os testes"
     echo "sh run test:unit         - Executa testes unitários"
@@ -30,6 +34,7 @@ show_commands () {
     echo "sh run prisma:migrate    - Executa migrações do banco"
     echo "sh run prisma:seed       - Executa seed do banco"
     echo "sh run prisma:studio     - Abre Prisma Studio"
+    echo "sh run consumer:test     - Testa integração Consumer"
     echo
 }
 
@@ -46,31 +51,63 @@ execute_npm_install () {
 start_app () {
     APP=$2
 
-    if [ -z "$APP" ] || [ "$APP" != "api" ]; then
-        echo "$ICON Use: sh run start-app api"
+    if [ -z "$APP" ]; then
+        echo "$ICON Use: sh run start-app api|consumer|all"
         exit 1
     fi
 
     devops_start
     execute_npm_install
 
-    echo "$ICON Iniciando API em modo desenvolvimento..."
-    npx nest start api --watch
+    case "$APP" in
+        "api")
+            echo "$ICON Iniciando API em modo desenvolvimento..."
+            npx nest start api --watch
+            ;;
+        "consumer")
+            echo "$ICON Iniciando Consumer em modo desenvolvimento..."
+            npx nest start consumer --watch
+            ;;
+        "all")
+            echo "$ICON Iniciando API + Consumer em modo desenvolvimento..."
+            npm run dev:all
+            ;;
+        *)
+            echo "$ICON Use: sh run start-app api|consumer|all"
+            exit 1
+            ;;
+    esac
 }
 
 debug () {
     APP=$2
 
-    if [ -z "$APP" ] || [ "$APP" != "api" ]; then
-        echo "$ICON Use: sh run debug api"
+    if [ -z "$APP" ]; then
+        echo "$ICON Use: sh run debug api|consumer|all"
         exit 1
     fi
 
     devops_start
     execute_npm_install
 
-    echo "$ICON Iniciando API em modo debug..."
-    npx nest start api --debug
+    case "$APP" in
+        "api")
+            echo "$ICON Iniciando API em modo debug..."
+            npx nest start api --debug
+            ;;
+        "consumer")
+            echo "$ICON Iniciando Consumer em modo debug..."
+            npx nest start consumer --debug
+            ;;
+        "all")
+            echo "$ICON Iniciando API + Consumer em modo debug..."
+            npm run dev:all
+            ;;
+        *)
+            echo "$ICON Use: sh run debug api|consumer|all"
+            exit 1
+            ;;
+    esac
 }
 
 build_app () {
@@ -143,6 +180,11 @@ prisma_studio () {
     npx prisma studio --schema=apps/api/prisma/schema.prisma
 }
 
+consumer_test () {
+    echo "$ICON Testando integração Consumer..."
+    ./scripts/test-consumer-integration.sh
+}
+
 if [ $# -gt 0 ]; then
     case "$1" in
       "start-app") start_app "$@" ;;
@@ -161,6 +203,7 @@ if [ $# -gt 0 ]; then
       "prisma:migrate") prisma_migrate "$@" ;;
       "prisma:seed") prisma_seed "$@" ;;
       "prisma:studio") prisma_studio "$@" ;;
+      "consumer:test") consumer_test "$@" ;;
     *) show_commands ;;
     esac
 else

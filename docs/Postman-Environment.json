@@ -1,0 +1,67 @@
+{
+  "id": "payment-api-env",
+  "name": "Payment API Environment",
+  "values": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5050",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "payment_id_approved",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "payment_id_rejected",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "payment_id_pending",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "pix_payment_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "unique_timestamp",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "rejected_timestamp",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "pending_timestamp",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "test_run_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "api_health_check",
+      "value": "false",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

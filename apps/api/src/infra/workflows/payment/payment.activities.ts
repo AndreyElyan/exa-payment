@@ -116,12 +116,31 @@ export class PaymentActivitiesImpl implements PaymentActivities {
     );
 
     if (input.oldStatus !== input.newStatus) {
-      await this.domainEventService.publishPaymentStatusChanged({
-        paymentId: input.paymentId,
-        oldStatus: input.oldStatus,
-        newStatus: input.newStatus,
-        occurredAt: new Date(),
-      });
+      const payment = await this.paymentRepository.findById(input.paymentId);
+
+      if (payment) {
+        await this.domainEventService.publishPaymentStatusChanged({
+          paymentId: input.paymentId,
+          oldStatus: input.oldStatus,
+          newStatus: input.newStatus,
+          occurredAt: new Date(),
+          payment: {
+            cpf: payment.cpf,
+            amount: payment.amount,
+            paymentMethod: payment.paymentMethod,
+          },
+        });
+      } else {
+        this.logger.warn(
+          `Payment ${input.paymentId} not found, publishing event without payment data`,
+        );
+        await this.domainEventService.publishPaymentStatusChanged({
+          paymentId: input.paymentId,
+          oldStatus: input.oldStatus,
+          newStatus: input.newStatus,
+          occurredAt: new Date(),
+        });
+      }
     }
 
     this.logger.log(`Status change event published: ${input.paymentId}`);

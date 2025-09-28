@@ -70,3 +70,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 *.pem
 package-lock.json
 apps/api/dist/
+apps/consumer/dist/

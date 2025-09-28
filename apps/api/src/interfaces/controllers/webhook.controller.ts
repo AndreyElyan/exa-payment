@@ -46,12 +46,10 @@ export class WebhookController {
     this.logger.log("Body:", JSON.stringify(body, null, 2));
 
     try {
-      // Validar payload básico
       if (!body || !body.type || !body.data) {
         throw new BadRequestException("Invalid webhook payload");
       }
 
-      // Processar apenas webhooks de pagamento
       if (body.type !== "payment") {
         this.logger.log(`Ignoring webhook type: ${body.type}`);
         return {
@@ -72,21 +70,18 @@ export class WebhookController {
         };
       }
 
-      // Mapear status do Mercado Pago para nossos status
       const mappedStatus = this.mapMercadoPagoStatus(mercadoPagoStatus);
 
       this.logger.log(
         `Processing payment ${paymentId} with status ${mercadoPagoStatus} -> ${mappedStatus}`,
       );
 
-      // Construir ID do workflow
       const workflowId = `credit-card-payment-${paymentId}`;
 
       this.logger.log(
         `Signaling workflow ${workflowId} with status ${mappedStatus}`,
       );
 
-      // Enviar sinal para o workflow do Temporal
       await this.temporalClient.signalPaymentStatus(
         workflowId,
         mappedStatus,
@@ -102,7 +97,6 @@ export class WebhookController {
     } catch (error) {
       this.logger.error("Error processing webhook:", error);
 
-      // Retornar erro para que o Mercado Pago tente novamente
       throw new BadRequestException(
         `Webhook processing failed: ${error.message}`,
       );
@@ -110,7 +104,6 @@ export class WebhookController {
   }
 
   private mapMercadoPagoStatus(mercadoPagoStatus: string): string {
-    // Mapear status do Mercado Pago para nossos status
     switch (mercadoPagoStatus) {
       case "approved":
         return "PAID";

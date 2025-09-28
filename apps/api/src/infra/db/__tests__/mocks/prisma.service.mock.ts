@@ -289,7 +289,6 @@ export class MockPrismaService {
     };
   }
 
-  // Helper methods for testing
   clear() {
     this.payments = [];
     this.idempotencyKeys = [];

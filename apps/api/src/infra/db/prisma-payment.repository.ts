@@ -25,8 +25,6 @@ export class PrismaPaymentRepository implements PaymentRepository {
       status: payment.status,
       providerRef: payment.providerRef || null,
     };
-
-    // Usar transação explícita para garantir persistência
     const result = await this.prisma.$transaction(async (tx) => {
       const saved = await tx.payment.create({
         data,

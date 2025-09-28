@@ -53,6 +53,18 @@ export class UpdatePaymentUseCase {
     const statusChanged = oldStatus !== newStatus;
 
     if (statusChanged) {
+      await this.domainEventService.publishPaymentStatusChanged({
+        paymentId: updatedPayment.id,
+        oldStatus,
+        newStatus,
+        occurredAt: new Date(),
+        payment: {
+          cpf: updatedPayment.cpf,
+          amount: updatedPayment.amount,
+          paymentMethod: updatedPayment.paymentMethod,
+        },
+      });
+
       const domainEvents = updatedPayment.getDomainEvents();
       domainEvents.forEach((event) => {
         this.domainEventService.addEvent(event);

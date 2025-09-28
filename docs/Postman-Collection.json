@@ -1,0 +1,1141 @@
+{
+  "info": {
+    "name": "Payment API Tests - Mercado Pago + Temporal",
+    "description": "Collection completa para testar a integração de pagamentos com Mercado Pago e Temporal",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5050",
+      "type": "string"
+    },
+    {
+      "key": "payment_id_approved",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "payment_id_rejected",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "payment_id_pending",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Setup",
+      "item": [
+        {
+          "name": "Test Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"test\": true,\n  \"message\": \"Teste webhook Postman\",\n  \"timestamp\": \"{{$timestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhook/mercado-pago/test",
+              "host": ["{{base_url}}"],
+              "path": ["webhook", "mercado-pago", "test"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create PIX Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has ID\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "});",
+                  "",
+                  "// Salvar ID do PIX para referência",
+                  "if (pm.response.json().id) {",
+                  "    pm.environment.set(\"pix_payment_id\", pm.response.json().id);",
+                  "    console.log(\"PIX Payment ID saved:\", pm.response.json().id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"Teste PIX Postman\",\n  \"amount\": 100.50,\n  \"paymentMethod\": \"PIX\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Main Flow",
+      "item": [
+        {
+          "name": "Create CREDIT_CARD Payment",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Limpar variáveis anteriores para garantir dados frescos",
+                  "pm.environment.unset(\"payment_id_approved\");",
+                  "pm.environment.unset(\"payment_id_rejected\");",
+                  "pm.environment.unset(\"payment_id_pending\");",
+                  "pm.environment.unset(\"pix_payment_id\");",
+                  "",
+                  "// Gerar timestamp único para evitar conflitos",
+                  "pm.environment.set(\"unique_timestamp\", Date.now());",
+                  "console.log(\"Variables cleared and timestamp generated:\", pm.environment.get(\"unique_timestamp\"));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has ID\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "});",
+                  "",
+                  "pm.test(\"Response has providerRef\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('providerRef');",
+                  "});",
+                  "",
+                  "// Salvar ID para próximos testes com validação",
+                  "if (pm.response.json().id) {",
+                  "    pm.environment.set(\"payment_id_approved\", pm.response.json().id);",
+                  "    console.log(\"✅ Payment ID approved saved:\", pm.response.json().id);",
+                  "    console.log(\"✅ Provider Ref:\", pm.response.json().providerRef);",
+                  "} else {",
+                  "    console.error(\"❌ Failed to save payment ID - no ID in response\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "test-temporal-{{unique_timestamp}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"Teste Cartão Postman\",\n  \"amount\": 150.00,\n  \"paymentMethod\": \"CREDIT_CARD\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Webhook Approved",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Verificar se payment_id_approved existe",
+                  "const paymentId = pm.environment.get('payment_id_approved');",
+                  "if (!paymentId) {",
+                  "    console.error('❌ payment_id_approved not found! Run Create CREDIT_CARD Payment first.');",
+                  "    throw new Error('payment_id_approved is required');",
+                  "}",
+                  "console.log('✅ Using payment ID for webhook:', paymentId);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Webhook response has success status\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData.status).to.eql('success');",
+                  "});",
+                  "",
+                  "pm.test(\"Webhook response has message\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});",
+                  "",
+                  "// Log do resultado",
+                  "const response = pm.response.json();",
+                  "console.log('✅ Webhook Approved Response:', response);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 999999999,\n  \"live_mode\": false,\n  \"type\": \"payment\",\n  \"date_created\": \"{{$timestamp}}\",\n  \"data\": {\n    \"id\": \"999999999\",\n    \"status\": \"approved\",\n    \"external_reference\": \"{{payment_id_approved}}\",\n    \"transaction_amount\": 150.00,\n    \"currency_id\": \"BRL\",\n    \"payment_method_id\": \"credit_card\",\n    \"date_approved\": \"{{$timestamp}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhook/mercado-pago",
+              "host": ["{{base_url}}"],
+              "path": ["webhook", "mercado-pago"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payment by ID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Verificar se payment_id_approved existe",
+                  "const paymentId = pm.environment.get('payment_id_approved');",
+                  "if (!paymentId) {",
+                  "    console.error('❌ payment_id_approved not found! Run Create CREDIT_CARD Payment first.');",
+                  "    throw new Error('payment_id_approved is required');",
+                  "}",
+                  "console.log('✅ Getting payment by ID:', paymentId);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has payment ID\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData.id).to.eql(pm.environment.get('payment_id_approved'));",
+                  "});",
+                  "",
+                  "pm.test(\"Payment status is PAID\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData.status).to.eql('PAID');",
+                  "});",
+                  "",
+                  "// Log do resultado",
+                  "const response = pm.response.json();",
+                  "console.log('✅ Payment Details:', {",
+                  "    id: response.id,",
+                  "    status: response.status,",
+                  "    paymentMethod: response.paymentMethod,",
+                  "    amount: response.amount",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment/{{payment_id_approved}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "{{payment_id_approved}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List All Payments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Payments with Filters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment?status=PAID&paymentMethod=CREDIT_CARD&page=1&limit=5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PAID"
+                },
+                {
+                  "key": "paymentMethod",
+                  "value": "CREDIT_CARD"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Payments by CPF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment?cpf=11144477735",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"],
+              "query": [
+                {
+                  "key": "cpf",
+                  "value": "11144477735"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Payments by Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment?status=PENDING",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Payments by Payment Method",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment?paymentMethod=PIX",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"],
+              "query": [
+                {
+                  "key": "paymentMethod",
+                  "value": "PIX"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Payments with Pagination",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Payments Combined Filters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment?cpf=11144477735&status=PENDING&paymentMethod=CREDIT_CARD&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"],
+              "query": [
+                {
+                  "key": "cpf",
+                  "value": "11144477735"
+                },
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                },
+                {
+                  "key": "paymentMethod",
+                  "value": "CREDIT_CARD"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Additional Tests",
+      "item": [
+        {
+          "name": "Create CREDIT_CARD for Rejected",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Gerar timestamp único para evitar conflitos",
+                  "pm.environment.set(\"rejected_timestamp\", Date.now());",
+                  "console.log(\"Creating payment for rejection test with timestamp:\", pm.environment.get(\"rejected_timestamp\"));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has ID\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "});",
+                  "",
+                  "// Salvar ID para teste de rejeição com validação",
+                  "if (pm.response.json().id) {",
+                  "    pm.environment.set(\"payment_id_rejected\", pm.response.json().id);",
+                  "    console.log(\"✅ Payment ID rejected saved:\", pm.response.json().id);",
+                  "} else {",
+                  "    console.error(\"❌ Failed to save payment ID for rejection - no ID in response\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "test-rejected-{{rejected_timestamp}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"Teste Rejeitado\",\n  \"amount\": 75.50,\n  \"paymentMethod\": \"CREDIT_CARD\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Webhook Rejected",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Verificar se payment_id_rejected existe",
+                  "const paymentId = pm.environment.get('payment_id_rejected');",
+                  "if (!paymentId) {",
+                  "    console.error('❌ payment_id_rejected not found! Run Create CREDIT_CARD for Rejected first.');",
+                  "    throw new Error('payment_id_rejected is required');",
+                  "}",
+                  "console.log('✅ Using payment ID for rejected webhook:', paymentId);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Webhook response has success status\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData.status).to.eql('success');",
+                  "});",
+                  "",
+                  "// Log do resultado",
+                  "const response = pm.response.json();",
+                  "console.log('✅ Webhook Rejected Response:', response);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 999999998,\n  \"live_mode\": false,\n  \"type\": \"payment\",\n  \"date_created\": \"{{$timestamp}}\",\n  \"data\": {\n    \"id\": \"999999998\",\n    \"status\": \"rejected\",\n    \"external_reference\": \"{{payment_id_rejected}}\",\n    \"transaction_amount\": 75.50,\n    \"currency_id\": \"BRL\",\n    \"payment_method_id\": \"credit_card\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhook/mercado-pago",
+              "host": ["{{base_url}}"],
+              "path": ["webhook", "mercado-pago"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create CREDIT_CARD for Pending",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "// Salvar ID para teste de pendente",
+                  "if (pm.response.json().id) {",
+                  "    pm.environment.set(\"payment_id_pending\", pm.response.json().id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "test-pending-{{$timestamp}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"Teste Pendente\",\n  \"amount\": 200.00,\n  \"paymentMethod\": \"CREDIT_CARD\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Webhook Pending",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 999999997,\n  \"live_mode\": false,\n  \"type\": \"payment\",\n  \"date_created\": \"{{$timestamp}}\",\n  \"data\": {\n    \"id\": \"999999997\",\n    \"status\": \"pending\",\n    \"external_reference\": \"{{payment_id_pending}}\",\n    \"transaction_amount\": 200.00,\n    \"currency_id\": \"BRL\",\n    \"payment_method_id\": \"credit_card\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhook/mercado-pago",
+              "host": ["{{base_url}}"],
+              "path": ["webhook", "mercado-pago"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Payment Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PAID\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment/{{payment_id_approved}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "{{payment_id_approved}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Payment Status to FAIL",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"FAIL\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment/{{payment_id_rejected}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "{{payment_id_rejected}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Payment Status to PENDING",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PENDING\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment/{{payment_id_pending}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "{{payment_id_pending}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Tests",
+      "item": [
+        {
+          "name": "No Idempotency-Key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"Teste sem Idempotency-Key\",\n  \"amount\": 100.00,\n  \"paymentMethod\": \"CREDIT_CARD\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid CPF",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"123\",\n  \"description\": \"Teste CPF Inválido\",\n  \"amount\": 100.00,\n  \"paymentMethod\": \"PIX\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Webhook No External Reference",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 999999996,\n  \"live_mode\": false,\n  \"type\": \"payment\",\n  \"date_created\": \"{{$timestamp}}\",\n  \"data\": {\n    \"id\": \"999999996\",\n    \"status\": \"approved\",\n    \"transaction_amount\": 100.00,\n    \"currency_id\": \"BRL\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhook/mercado-pago",
+              "host": ["{{base_url}}"],
+              "path": ["webhook", "mercado-pago"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Webhook Different Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 999999995,\n  \"live_mode\": false,\n  \"type\": \"subscription\",\n  \"date_created\": \"{{$timestamp}}\",\n  \"data\": {\n    \"id\": \"999999995\",\n    \"status\": \"active\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhook/mercado-pago",
+              "host": ["{{base_url}}"],
+              "path": ["webhook", "mercado-pago"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Amount (Zero)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"Teste Amount Zero\",\n  \"amount\": 0,\n  \"paymentMethod\": \"PIX\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Amount (Negative)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"Teste Amount Negative\",\n  \"amount\": -100.00,\n  \"paymentMethod\": \"PIX\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Payment Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"Teste Invalid Method\",\n  \"amount\": 100.00,\n  \"paymentMethod\": \"INVALID\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Empty Description",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"\",\n  \"amount\": 100.00,\n  \"paymentMethod\": \"PIX\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Missing Required Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payment by Invalid ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment/invalid-id-12345",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "invalid-id-12345"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Payment with Invalid Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"INVALID_STATUS\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment/{{payment_id_approved}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment", "{{payment_id_approved}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Payments Invalid Page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment?page=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Payments Invalid Limit",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment?limit=150",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "150"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "JSON Malformed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"Teste JSON Malformado\",\n  \"amount\": 100.00,\n  \"paymentMethod\": \"PIX\""
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Wrong Content-Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"11144477735\",\n  \"description\": \"Teste Content-Type\",\n  \"amount\": 100.00,\n  \"paymentMethod\": \"PIX\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Method Not Allowed",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payment"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Non-existent Endpoint",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/nonexistent",
+              "host": ["{{base_url}}"],
+              "path": ["api", "nonexistent"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

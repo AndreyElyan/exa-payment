@@ -318,7 +318,6 @@ describe("CreatePaymentUseCase with Temporal Integration", () => {
       await expect(
         useCase.execute({
           dto: creditCardDto,
-          // No idempotencyKey provided
         }),
       ).rejects.toThrow(BadRequestException);
     });

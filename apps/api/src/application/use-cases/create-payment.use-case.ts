@@ -13,6 +13,7 @@ import { PaymentRepository } from "../ports/payment.repository.port";
 import { PaymentProvider } from "../ports/payment-provider.port";
 import { CreatePaymentDto } from "../../interfaces/dto/create-payment.dto";
 import { TemporalClientService } from "../../infra/workflows/temporal-client";
+import { DomainEventService } from "../../domain/services/domain-event.service";
 
 export interface CreatePaymentInput {
   dto: CreatePaymentDto;
@@ -36,6 +37,7 @@ export class CreatePaymentUseCase {
     @Inject(IdempotencyService)
     private readonly idempotencyService: IdempotencyService,
     private readonly temporalClient: TemporalClientService,
+    private readonly domainEventService: DomainEventService,
   ) {}
 
   async execute(input: CreatePaymentInput): Promise<CreatePaymentOutput> {
@@ -167,6 +169,15 @@ export class CreatePaymentUseCase {
         savedPayment.id,
       );
     }
+
+    await this.domainEventService.publishPaymentCreated({
+      paymentId: savedPayment.id,
+      customerId: savedPayment.cpf,
+      amount: savedPayment.amount,
+      paymentMethod: savedPayment.paymentMethod as any,
+      status: savedPayment.status as any,
+      timestamp: new Date(),
+    });
 
     return { payment: savedPayment, isNew: true };
   }

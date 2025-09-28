@@ -16,6 +16,8 @@ import { GlobalExceptionFilter } from "./common/filters/global-exception.filter"
 import { TemporalClientService } from "./infra/workflows/temporal-client";
 import { TemporalWorkerService } from "./infra/workflows/temporal-worker";
 import { PaymentActivitiesImpl } from "./infra/workflows/payment/payment.activities";
+import { RabbitMQPublisherService } from "./infra/messaging/rabbitmq-publisher.service";
+import { RabbitMQSetupService } from "./infra/messaging/rabbitmq-setup.service";
 
 @Module({
   imports: [],
@@ -36,6 +38,8 @@ import { PaymentActivitiesImpl } from "./infra/workflows/payment/payment.activit
       inject: [PaymentProviderConfigService],
     },
     IdempotencyService,
+    RabbitMQSetupService,
+    RabbitMQPublisherService,
     DomainEventService,
     TemporalClientService,
     TemporalWorkerService,
