@@ -69,3 +69,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .nx
 *.pem
 package-lock.json
+apps/api/dist/

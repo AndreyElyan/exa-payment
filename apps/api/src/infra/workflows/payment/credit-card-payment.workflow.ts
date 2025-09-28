@@ -8,7 +8,7 @@ import {
   ApplicationFailure,
 } from "@temporalio/workflow";
 import { PaymentStatus } from "../../../domain/entities/payment.entity";
-import type { PaymentActivities } from "./payment.activities";
+import type { PaymentActivities } from "./payment.activities.interfaces";
 
 const {
   createPaymentRecord,
