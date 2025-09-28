@@ -11,7 +11,7 @@ import { UpdatePaymentDto } from "../../../interfaces/dto/update-payment.dto";
 describe("UpdatePaymentUseCase", () => {
   let useCase: UpdatePaymentUseCase;
   let mockPaymentRepository: any;
-  let mockDomainEventService: DomainEventService;
+  let mockDomainEventService: any;
 
   beforeEach(() => {
     mockPaymentRepository = {
@@ -19,7 +19,16 @@ describe("UpdatePaymentUseCase", () => {
       update: vi.fn(),
     };
 
-    mockDomainEventService = new DomainEventService();
+    mockDomainEventService = {
+      publishPaymentStatusChanged: vi.fn(),
+      publishPaymentCreated: vi.fn(),
+      publishPaymentApproved: vi.fn(),
+      publishPaymentRejected: vi.fn(),
+      publishPaymentCompleted: vi.fn(),
+      addEvent: vi.fn(),
+      getEvents: vi.fn().mockReturnValue([]),
+      hasEvents: vi.fn().mockReturnValue(false),
+    };
 
     useCase = new UpdatePaymentUseCase(
       mockPaymentRepository,
@@ -48,6 +57,19 @@ describe("UpdatePaymentUseCase", () => {
       expect(result.payment.status).toBe(PaymentStatus.PAID);
       expect(mockPaymentRepository.findById).toHaveBeenCalledWith(paymentId);
       expect(mockPaymentRepository.update).toHaveBeenCalledTimes(1);
+      expect(
+        mockDomainEventService.publishPaymentStatusChanged,
+      ).toHaveBeenCalledWith({
+        paymentId: expect.any(String),
+        oldStatus: PaymentStatus.PENDING,
+        newStatus: PaymentStatus.PAID,
+        occurredAt: expect.any(Date),
+        payment: {
+          cpf: existingPayment.cpf,
+          amount: existingPayment.amount,
+          paymentMethod: existingPayment.paymentMethod,
+        },
+      });
     });
 
     it("should update PENDING to FAIL successfully (Cenário 2)", async () => {
@@ -69,6 +91,19 @@ describe("UpdatePaymentUseCase", () => {
       expect(result.statusChanged).toBe(true);
       expect(result.payment.status).toBe(PaymentStatus.FAIL);
       expect(mockPaymentRepository.update).toHaveBeenCalledTimes(1);
+      expect(
+        mockDomainEventService.publishPaymentStatusChanged,
+      ).toHaveBeenCalledWith({
+        paymentId: expect.any(String),
+        oldStatus: PaymentStatus.PENDING,
+        newStatus: PaymentStatus.FAIL,
+        occurredAt: expect.any(Date),
+        payment: {
+          cpf: existingPayment.cpf,
+          amount: existingPayment.amount,
+          paymentMethod: existingPayment.paymentMethod,
+        },
+      });
     });
 
     it("should handle idempotent update (same status) (Cenário 3)", async () => {
@@ -216,9 +251,19 @@ describe("UpdatePaymentUseCase", () => {
 
       await useCase.execute({ id: paymentId, dto });
 
-      expect(mockDomainEventService.hasEvents()).toBe(true);
-      const events = mockDomainEventService.getEvents();
-      expect(events).toHaveLength(1);
+      expect(
+        mockDomainEventService.publishPaymentStatusChanged,
+      ).toHaveBeenCalledWith({
+        paymentId: expect.any(String),
+        oldStatus: PaymentStatus.PENDING,
+        newStatus: PaymentStatus.PAID,
+        occurredAt: expect.any(Date),
+        payment: {
+          cpf: existingPayment.cpf,
+          amount: existingPayment.amount,
+          paymentMethod: existingPayment.paymentMethod,
+        },
+      });
     });
 
     it("should not add domain event when status does not change", async () => {
@@ -239,7 +284,9 @@ describe("UpdatePaymentUseCase", () => {
 
       await useCase.execute({ id: paymentId, dto });
 
-      expect(mockDomainEventService.hasEvents()).toBe(false);
+      expect(
+        mockDomainEventService.publishPaymentStatusChanged,
+      ).not.toHaveBeenCalled();
     });
   });
 });

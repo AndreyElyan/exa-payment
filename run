@@ -35,6 +35,9 @@ show_commands () {
     echo "sh run prisma:seed       - Executa seed do banco"
     echo "sh run prisma:studio     - Abre Prisma Studio"
     echo "sh run consumer:test     - Testa integração Consumer"
+    echo "sh run tracing:test      - Testa configuração de tracing"
+    echo "sh run jaeger:start      - Inicia apenas Jaeger"
+    echo "sh run jaeger:stop       - Para Jaeger"
     echo
 }
 
@@ -185,6 +188,43 @@ consumer_test () {
     ./scripts/test-consumer-integration.sh
 }
 
+tracing_test () {
+    echo "$ICON Testando configuração de tracing..."
+
+    # Check if Jaeger is running
+    if ! curl -s http://localhost:16686 > /dev/null 2>&1; then
+        echo "❌ Jaeger UI is not accessible at http://localhost:16686"
+        echo "   Please start Jaeger first: sh run jaeger:start"
+        echo "   Or start all infrastructure: sh run docker:up"
+        exit 1
+    fi
+
+    echo "✅ Jaeger UI is accessible"
+
+    # Check if API is running
+    if ! curl -s http://localhost:5050/health > /dev/null 2>&1; then
+        echo "❌ API is not running on port 5050"
+        echo "   Please start the API first: sh run start-app api"
+        exit 1
+    fi
+
+    echo "✅ API is running"
+}
+
+
+
+jaeger_start () {
+    echo "$ICON Iniciando Jaeger..."
+    docker-compose -f dev/docker-compose.yml up -d jaeger
+    echo "✅ Jaeger iniciado em http://localhost:16686"
+}
+
+jaeger_stop () {
+    echo "$ICON Parando Jaeger..."
+    docker-compose -f dev/docker-compose.yml stop jaeger
+    echo "✅ Jaeger parado"
+}
+
 if [ $# -gt 0 ]; then
     case "$1" in
       "start-app") start_app "$@" ;;
@@ -204,6 +244,10 @@ if [ $# -gt 0 ]; then
       "prisma:seed") prisma_seed "$@" ;;
       "prisma:studio") prisma_studio "$@" ;;
       "consumer:test") consumer_test "$@" ;;
+      "tracing:test") tracing_test "$@" ;;
+      "tracing:validate") tracing_validate "$@" ;;
+      "jaeger:start") jaeger_start "$@" ;;
+      "jaeger:stop") jaeger_stop "$@" ;;
     *) show_commands ;;
     esac
 else

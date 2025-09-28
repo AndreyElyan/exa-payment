@@ -3,10 +3,18 @@ import { ValidationPipe, BadRequestException } from "@nestjs/common";
 import { AppModule } from "./app.module";
 import { TemporalWorkerService } from "./infra/workflows/temporal-worker";
 import { GlobalExceptionFilter } from "./common/filters/global-exception.filter";
+import {
+  TracingService,
+  createTracingConfig,
+} from "./infra/observability/tracing.config";
 
 async function bootstrap() {
   try {
     console.log("🚀 Starting Payment API...");
+
+    const tracingConfig = createTracingConfig();
+    const tracingService = new TracingService(tracingConfig);
+    tracingService.initialize();
 
     const app = await NestFactory.create(AppModule);
 
@@ -56,6 +64,11 @@ async function bootstrap() {
     console.log("🎛️ Temporal UI available at: http://localhost:8080");
 
     console.log("🚀 Ready to process payments with Temporal Workflows!");
+
+    if (tracingConfig.enabled) {
+      console.log("🔍 Jaeger tracing enabled");
+      console.log(`📊 Jaeger UI: http://localhost:16686`);
+    }
   } catch (error) {
     console.error("❌ Error starting application:", error);
     process.exit(1);

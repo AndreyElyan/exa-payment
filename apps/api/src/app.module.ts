@@ -18,6 +18,11 @@ import { TemporalWorkerService } from "./infra/workflows/temporal-worker";
 import { PaymentActivitiesImpl } from "./infra/workflows/payment/payment.activities";
 import { RabbitMQPublisherService } from "./infra/messaging/rabbitmq-publisher.service";
 import { RabbitMQSetupService } from "./infra/messaging/rabbitmq-setup.service";
+import {
+  TracingService,
+  createTracingConfig,
+} from "./infra/observability/tracing.config";
+import { CustomTracingService } from "./infra/observability/tracing.service";
 
 @Module({
   imports: [],
@@ -47,6 +52,14 @@ import { RabbitMQSetupService } from "./infra/messaging/rabbitmq-setup.service";
     CreatePaymentUseCase,
     UpdatePaymentUseCase,
     GlobalExceptionFilter,
+    {
+      provide: TracingService,
+      useFactory: () => {
+        const config = createTracingConfig();
+        return new TracingService(config);
+      },
+    },
+    CustomTracingService,
   ],
 })
 export class AppModule {}

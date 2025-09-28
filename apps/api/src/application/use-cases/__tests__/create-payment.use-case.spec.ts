@@ -8,6 +8,7 @@ import {
 import { IdempotencyService } from "../../../domain/services/idempotency.service";
 import { CreatePaymentDto } from "../../../interfaces/dto/create-payment.dto";
 import { TemporalClientService } from "../../../infra/workflows/temporal-client";
+import { DomainEventService } from "../../../domain/services/domain-event.service";
 
 describe("CreatePaymentUseCase", () => {
   let useCase: CreatePaymentUseCase;
@@ -15,6 +16,7 @@ describe("CreatePaymentUseCase", () => {
   let mockPaymentProvider: any;
   let mockIdempotencyService: IdempotencyService;
   let mockTemporalClient: any;
+  let mockDomainEventService: any;
 
   beforeEach(() => {
     mockPaymentRepository = {
@@ -34,6 +36,14 @@ describe("CreatePaymentUseCase", () => {
       getWorkflowResult: vi.fn(),
     };
 
+    mockDomainEventService = {
+      publishPaymentCreated: vi.fn(),
+      publishPaymentStatusChanged: vi.fn(),
+      publishPaymentApproved: vi.fn(),
+      publishPaymentRejected: vi.fn(),
+      publishPaymentCompleted: vi.fn(),
+    };
+
     mockIdempotencyService = new IdempotencyService();
 
     useCase = new CreatePaymentUseCase(
@@ -41,6 +51,7 @@ describe("CreatePaymentUseCase", () => {
       mockPaymentProvider,
       mockIdempotencyService,
       mockTemporalClient,
+      mockDomainEventService,
     );
   });
 

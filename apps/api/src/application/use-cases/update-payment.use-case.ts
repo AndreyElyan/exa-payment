@@ -8,6 +8,7 @@ import { PaymentRepository } from "../ports/payment.repository.port";
 import { Payment, PaymentStatus } from "../../domain/entities/payment.entity";
 import { UpdatePaymentDto } from "../../interfaces/dto/update-payment.dto";
 import { DomainEventService } from "../../domain/services/domain-event.service";
+import { CustomTracingService } from "../../infra/observability/tracing.service";
 
 export interface UpdatePaymentInput {
   id: string;
@@ -25,12 +26,34 @@ export class UpdatePaymentUseCase {
     @Inject("PaymentRepository")
     private readonly paymentRepository: PaymentRepository,
     private readonly domainEventService: DomainEventService,
+    private readonly tracingService: CustomTracingService,
   ) {}
 
   async execute(input: UpdatePaymentInput): Promise<UpdatePaymentOutput> {
-    const { id, dto } = input;
+    return this.tracingService.traceUseCase(
+      "UpdatePaymentUseCase",
+      "execute",
+      async () => {
+        const { id, dto } = input;
+        return this.executeInternal(id, dto);
+      },
+      {
+        "payment.id": input.id,
+        "payment.status": input.dto.status,
+      },
+    );
+  }
 
-    const existingPayment = await this.paymentRepository.findById(id);
+  private async executeInternal(
+    id: string,
+    dto: UpdatePaymentDto,
+  ): Promise<UpdatePaymentOutput> {
+    const existingPayment = await this.tracingService.traceDatabase(
+      "findById",
+      "payments",
+      async () => this.paymentRepository.findById(id),
+      { "payment.id": id },
+    );
 
     if (!existingPayment) {
       throw new NotFoundException("Payment not found");
@@ -48,7 +71,15 @@ export class UpdatePaymentUseCase {
       });
     }
 
-    const updatedPayment = await this.paymentRepository.update(existingPayment);
+    const updatedPayment = await this.tracingService.traceDatabase(
+      "update",
+      "payments",
+      async () => this.paymentRepository.update(existingPayment),
+      {
+        "payment.id": existingPayment.id,
+        "payment.status": dto.status,
+      },
+    );
 
     const statusChanged = oldStatus !== newStatus;
 

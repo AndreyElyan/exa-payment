@@ -14,6 +14,7 @@ import { PaymentProvider } from "../ports/payment-provider.port";
 import { CreatePaymentDto } from "../../interfaces/dto/create-payment.dto";
 import { TemporalClientService } from "../../infra/workflows/temporal-client";
 import { DomainEventService } from "../../domain/services/domain-event.service";
+import { CustomTracingService } from "../../infra/observability/tracing.service";
 
 export interface CreatePaymentInput {
   dto: CreatePaymentDto;
@@ -38,10 +39,31 @@ export class CreatePaymentUseCase {
     private readonly idempotencyService: IdempotencyService,
     private readonly temporalClient: TemporalClientService,
     private readonly domainEventService: DomainEventService,
+    private readonly tracingService: CustomTracingService,
   ) {}
 
   async execute(input: CreatePaymentInput): Promise<CreatePaymentOutput> {
     const { dto, idempotencyKey } = input;
+
+    return this.tracingService.traceUseCase(
+      "CreatePaymentUseCase",
+      "execute",
+      async () => {
+        return this.executeInternal(dto, idempotencyKey);
+      },
+      {
+        "payment.method": dto.paymentMethod,
+        "payment.amount": dto.amount,
+        "payment.cpf": dto.cpf,
+        "idempotency.key": idempotencyKey || "none",
+      },
+    );
+  }
+
+  private async executeInternal(
+    dto: CreatePaymentDto,
+    idempotencyKey?: string,
+  ): Promise<CreatePaymentOutput> {
     if (typeof dto.amount !== "number" || dto.amount < 0.01) {
       throw new BadRequestException(
         "Amount deve ser um número positivo maior que 0.01",
@@ -136,13 +158,21 @@ export class CreatePaymentUseCase {
         );
 
         try {
-          const providerResult =
-            await this.paymentProvider.createCreditCardCharge({
-              amount: payment.amount,
-              description: payment.description,
-              idempotencyKey: idempotencyKey || payment.id,
-              cpf: payment.cpf,
-            });
+          const providerResult = await this.tracingService.traceProvider(
+            "MercadoPagoProvider",
+            "createCreditCardCharge",
+            async () =>
+              this.paymentProvider.createCreditCardCharge({
+                amount: payment.amount,
+                description: payment.description,
+                idempotencyKey: idempotencyKey || payment.id,
+                cpf: payment.cpf,
+              }),
+            {
+              "payment.amount": payment.amount,
+              "payment.id": payment.id,
+            },
+          );
 
           payment.setProviderRef(providerResult.providerRef);
           this.logger.log(
@@ -160,7 +190,15 @@ export class CreatePaymentUseCase {
       }
     }
 
-    const savedPayment = await this.paymentRepository.save(payment);
+    const savedPayment = await this.tracingService.traceDatabase(
+      "save",
+      "payments",
+      async () => this.paymentRepository.save(payment),
+      {
+        "payment.id": payment.id,
+        "payment.method": payment.paymentMethod,
+      },
+    );
 
     if (idempotencyKey) {
       this.idempotencyService.storeKey(

@@ -1,11 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Client, Connection, WorkflowIdReusePolicy } from "@temporalio/client";
 import { CreditCardPaymentInput } from "./payment/credit-card-payment.workflow";
+import { CustomTracingService } from "../observability/tracing.service";
 
 @Injectable()
 export class TemporalClientService {
   private readonly logger = new Logger(TemporalClientService.name);
   private client?: Client;
+
+  constructor(private readonly tracingService: CustomTracingService) {}
 
   async getClient(): Promise<Client> {
     if (!this.client) {
@@ -23,6 +26,25 @@ export class TemporalClientService {
   }
 
   async startCreditCardPaymentWorkflow(input: {
+    paymentId: string;
+    cpf: string;
+    description: string;
+    amount: number;
+    idempotencyKey: string;
+  }): Promise<{ workflowId: string; runId: string }> {
+    return this.tracingService.traceWorkflow(
+      "CreditCardPayment",
+      "startWorkflow",
+      async () => this.startCreditCardPaymentWorkflowInternal(input),
+      {
+        "payment.id": input.paymentId,
+        "payment.amount": input.amount,
+        "payment.method": "CREDIT_CARD",
+      },
+    );
+  }
+
+  private async startCreditCardPaymentWorkflowInternal(input: {
     paymentId: string;
     cpf: string;
     description: string;

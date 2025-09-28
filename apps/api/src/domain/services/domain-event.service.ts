@@ -3,6 +3,7 @@ import {
   RabbitMQPublisherService,
   PaymentEvent,
 } from "../../infra/messaging/rabbitmq-publisher.service";
+import { CustomTracingService } from "../../infra/observability/tracing.service";
 
 export interface DomainEvent {
   occurredAt: Date;
@@ -16,6 +17,7 @@ export class DomainEventService {
   constructor(
     @Inject(RabbitMQPublisherService)
     private readonly rabbitMQPublisher: RabbitMQPublisherService,
+    private readonly tracingService: CustomTracingService,
   ) {}
 
   addEvent(event: DomainEvent): void {
@@ -64,7 +66,17 @@ export class DomainEventService {
         },
       };
 
-      await this.rabbitMQPublisher.publishPaymentStatusChanged(paymentEvent);
+      await this.tracingService.traceMessaging(
+        "publishPaymentStatusChanged",
+        "payment.status.changed",
+        async () =>
+          this.rabbitMQPublisher.publishPaymentStatusChanged(paymentEvent),
+        {
+          "payment.id": event.paymentId,
+          "payment.status": event.newStatus,
+          "payment.old_status": event.oldStatus,
+        },
+      );
       this.logger.log(
         `✅ Payment status changed event published for ${event.paymentId}`,
       );
