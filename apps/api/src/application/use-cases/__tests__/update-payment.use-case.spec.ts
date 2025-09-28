@@ -7,11 +7,13 @@ import {
 } from "../../../domain/entities/payment.entity";
 import { DomainEventService } from "../../../domain/services/domain-event.service";
 import { UpdatePaymentDto } from "../../../interfaces/dto/update-payment.dto";
+import { CustomTracingService } from "../../../infra/observability/tracing.service";
 
 describe("UpdatePaymentUseCase", () => {
   let useCase: UpdatePaymentUseCase;
   let mockPaymentRepository: any;
   let mockDomainEventService: any;
+  let mockTracingService: any;
 
   beforeEach(() => {
     mockPaymentRepository = {
@@ -30,9 +32,26 @@ describe("UpdatePaymentUseCase", () => {
       hasEvents: vi.fn().mockReturnValue(false),
     };
 
+    mockTracingService = {
+      traceUseCase: vi.fn().mockImplementation((name, method, fn) => fn()),
+      traceDatabase: vi
+        .fn()
+        .mockImplementation((operation, collection, fn) => fn()),
+      traceProvider: vi
+        .fn()
+        .mockImplementation((provider, operation, fn) => fn()),
+      traceMessaging: vi
+        .fn()
+        .mockImplementation((operation, destination, fn) => fn()),
+      traceWorkflow: vi
+        .fn()
+        .mockImplementation((workflow, operation, fn) => fn()),
+    };
+
     useCase = new UpdatePaymentUseCase(
       mockPaymentRepository,
       mockDomainEventService,
+      mockTracingService,
     );
   });
 

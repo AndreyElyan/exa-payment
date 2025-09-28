@@ -9,6 +9,7 @@ import { IdempotencyService } from "../../../domain/services/idempotency.service
 import { CreatePaymentDto } from "../../../interfaces/dto/create-payment.dto";
 import { TemporalClientService } from "../../../infra/workflows/temporal-client";
 import { DomainEventService } from "../../../domain/services/domain-event.service";
+import { CustomTracingService } from "../../../infra/observability/tracing.service";
 
 describe("CreatePaymentUseCase", () => {
   let useCase: CreatePaymentUseCase;
@@ -17,6 +18,7 @@ describe("CreatePaymentUseCase", () => {
   let mockIdempotencyService: IdempotencyService;
   let mockTemporalClient: any;
   let mockDomainEventService: any;
+  let mockTracingService: any;
 
   beforeEach(() => {
     mockPaymentRepository = {
@@ -44,6 +46,22 @@ describe("CreatePaymentUseCase", () => {
       publishPaymentCompleted: vi.fn(),
     };
 
+    mockTracingService = {
+      traceUseCase: vi.fn().mockImplementation((name, method, fn) => fn()),
+      traceDatabase: vi
+        .fn()
+        .mockImplementation((operation, collection, fn) => fn()),
+      traceProvider: vi
+        .fn()
+        .mockImplementation((provider, operation, fn) => fn()),
+      traceMessaging: vi
+        .fn()
+        .mockImplementation((operation, destination, fn) => fn()),
+      traceWorkflow: vi
+        .fn()
+        .mockImplementation((workflow, operation, fn) => fn()),
+    };
+
     mockIdempotencyService = new IdempotencyService();
 
     useCase = new CreatePaymentUseCase(
@@ -52,6 +70,7 @@ describe("CreatePaymentUseCase", () => {
       mockIdempotencyService,
       mockTemporalClient,
       mockDomainEventService,
+      mockTracingService,
     );
   });
 
