@@ -268,6 +268,12 @@ GET /api/payment/{id}
 
 ## 🔍 Observabilidade
 
+### Swagger UI
+
+- **URL**: http://localhost:5050/api/docs
+- **Documentação**: API completa com exemplos
+- **Testes**: Interface interativa para testar endpoints
+
 ### Jaeger Tracing
 
 - **URL**: http://localhost:16686

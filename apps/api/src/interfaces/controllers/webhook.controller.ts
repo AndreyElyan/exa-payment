@@ -8,6 +8,7 @@ import {
   HttpCode,
   BadRequestException,
 } from "@nestjs/common";
+import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from "@nestjs/swagger";
 import { TemporalClientService } from "../../infra/workflows/temporal-client";
 
 interface MercadoPagoWebhookPayload {
@@ -29,6 +30,7 @@ interface MercadoPagoWebhookPayload {
   };
 }
 
+@ApiTags("webhooks")
 @Controller("webhook")
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);
@@ -37,6 +39,23 @@ export class WebhookController {
 
   @Post("mercado-pago")
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Webhook do Mercado Pago",
+    description: "Recebe notificações de status de pagamento do Mercado Pago",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Webhook processado com sucesso",
+  })
+  @ApiResponse({
+    status: 400,
+    description: "Payload inválido",
+  })
+  @ApiHeader({
+    name: "x-signature",
+    description: "Assinatura do webhook (produção)",
+    required: false,
+  })
   async handleMercadoPagoWebhook(
     @Body() body: MercadoPagoWebhookPayload,
     @Headers() headers: Record<string, string>,
@@ -122,6 +141,14 @@ export class WebhookController {
 
   @Post("mercado-pago/test")
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Teste de webhook",
+    description: "Endpoint para testar webhooks do Mercado Pago",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Teste de webhook executado com sucesso",
+  })
   async testWebhook(
     @Body() body: any,
   ): Promise<{ status: string; message: string; received: any }> {

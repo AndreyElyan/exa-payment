@@ -73,14 +73,24 @@ export class TemporalWorkerService implements OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     this.logger.log("Shutting down Temporal Worker...");
 
-    if (this.worker) {
-      await this.worker.shutdown();
-    }
+    try {
+      if (this.worker) {
+        this.logger.log("Stopping worker...");
+        await this.worker.shutdown();
+        this.worker = undefined;
+      }
 
-    if (this.connection) {
-      await this.connection.close();
-    }
+      if (this.connection) {
+        this.logger.log("Closing connection...");
+        await this.connection.close();
+        this.connection = undefined;
+      }
 
-    this.logger.log("Temporal Worker shut down successfully");
+      this.isStarted = false;
+      this.logger.log("Temporal Worker shut down successfully");
+    } catch (error) {
+      this.logger.error("Error during Temporal Worker shutdown:", error);
+      throw error;
+    }
   }
 }
